@@ -1,0 +1,17 @@
+gcc -c cudampicommon.c -o cudampicommon.o
+mpicc -c cudampilib.c -I/usr/local/cuda/include
+nvcc -c appkernel.cu -o appkernel.o
+nvcc -c appkernelvecmaxdiv.cu -o appkernelvecmaxdiv.o
+nvcc -c appkernelvecadd.cu -o appkernelvecadd.o
+nvcc -c appkernelcollatz.cu -o appkernelcollatz.o
+nvcc -c appkernelpatternsearch.cu -o appkernelpatternsearch.o
+mpicc -fopenmp -o cudampislave cudampislave.c appkernel.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o cudampislave-vecmaxdiv cudampislave.c appkernelvecmaxdiv.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o cudampislave-vecadd cudampislave.c appkernelvecadd.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o cudampislave-collatz cudampislave.c appkernelcollatz.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o cudampislave-patternsearch cudampislave.c appkernelpatternsearch.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o app app.c appkernel.o cudampilib.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o app-streams-vecmaxdiv app-streams-vecmaxdiv.c appkernelvecmaxdiv.o cudampilib.o cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o app-streams-vecadd app-streams-vecadd.c appkernelvecadd.o cudampilib.o  cudampicommon.o -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o app-streams-collatz app-streams-collatz.c appkernelcollatz.o cudampilib.o cudampicommon.o  -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
+mpicc -fopenmp -o app-streams-patternsearch app-streams-patternsearch.c appkernelpatternsearch.o cudampilib.o cudampicommon.o  -I/usr/local/cuda/include -L/usr/local/cuda/lib64 -lcudart -lstdc++
