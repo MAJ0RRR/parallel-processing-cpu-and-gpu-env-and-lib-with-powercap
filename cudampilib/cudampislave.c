@@ -26,7 +26,7 @@ int *__cudampi__GPUcountspernode;
 
 MPI_Comm *__cudampi__communicators;
 
-int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
 int __cudampi_localdevicecount = 1;
 
 void launchkernel(void *devPtr);
@@ -68,15 +68,15 @@ int main(int argc, char **argv) {
 
   MPI_Allgather(&__cudampi_localdevicecount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi_totalgpudevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totalgpudevicecount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // create communicators
   // in the case of the slave we need to go by every GPU and for each GPU there will be a separate GPU shared with the master -- process 0
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 
   int commcounter = 0;
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totalgpudevicecount; i++) {
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 
