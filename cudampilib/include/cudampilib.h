@@ -28,7 +28,7 @@ void __cudampi__initializeMPI(int argc, char **argv);
 
 void __cudampi__terminateMPI();
 
-bool __cudampi__isCpu();
+int __cudampi__isCpu();
 
 int __cudampi__gettargetGPU(int device);
 
@@ -71,6 +71,7 @@ cudaError_t __cudampi__cpuGetDeviceCount(int *count);
 cudaError_t  __cudampi__getDeviceCount (int *count);
 
 void __cudampi__getCUDAdevicescount(int *cudadevicescount);
+void __cudampi__getCPUdevicescount(int *cudadevicescount);
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 

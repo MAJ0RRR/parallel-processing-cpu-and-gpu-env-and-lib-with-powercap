@@ -13,11 +13,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <omp.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-__device__ int isprime(long a) {
+int isprime(long a) {
   long i;
   for (i = 2; i < sqrt((double)a) + 1; i++) {
     if ((a % i) == 0) {
@@ -47,11 +48,11 @@ void appkernel(void *devPtr, int num_elements, int num_threads) {
   }
 }
 
-extern "C" void cpukernel(void *devPtr, int num_threads) {
+void cpukernel(void *devPtr, int num_threads) {
 
   // dim3 blocksingrid(100); // 20
   // dim3 threadsinblock(500);
   // num_elements = blocksingrid.x * threadsinblock.x
-  int num_elements = 100 * 500  
-  appkernel(dev_ptr, num_elements, num_thread);
+  int num_elements = 100 * 500;
+  appkernel(devPtr, num_elements, num_threads);
 }

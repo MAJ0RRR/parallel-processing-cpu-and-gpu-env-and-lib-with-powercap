@@ -278,8 +278,8 @@ cudaError_t __cudampi__getDeviceCount(int *count) {
   int cpuDevicesCount = 0;
   int gpuDevicesCount = 0;
 
-  __cudampi__getCPUdevicescount(&cpuDevicesCount);
-  __cudampi__getCUDAdevicescount(&cpuDevicesCount);
+  __cudampi__cudaGetDeviceCount(&cpuDevicesCount);
+  __cudampi__cpuGetDeviceCount(&cpuDevicesCount);
 
   *count = cpuDevicesCount + gpuDevicesCount;
   return cudaSuccess;
@@ -531,10 +531,10 @@ cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
 
 cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
   if (__cudampi__isCpu()) {
-    return __cudampi__cpuMalloc(device);
+    return __cudampi__cpuMalloc(devPtr, size);
   }
   // else
-  return __cudampi__cudaMalloc(device);
+  return __cudampi__cudaMalloc(devPtr, size);
 }
 
 
@@ -686,7 +686,7 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
   }
 }
 
-bool __cudampi__isCpu()
+int __cudampi__isCpu()
 {
   // TODO
   return omp_get_thread_num() >= __cudampi_totalgpudevicecount;
@@ -804,7 +804,7 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
   }
 }
 
-cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   return cudaSuccess;
 }
 
@@ -855,8 +855,6 @@ void __cudampi__kernel(void *devPtr) {
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
   }
 }
-
-void __cudampi__getFreeCpuThreads()
 
 void cpukernel(void *devPtr, int num_threads);
 
