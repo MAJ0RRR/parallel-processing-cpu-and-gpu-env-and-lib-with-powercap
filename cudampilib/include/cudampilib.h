@@ -46,8 +46,6 @@ cudaError_t __cudampi__deviceSynchronize(void);
 
 cudaError_t __cudampi__cudaSetDevice(int device);
 
-cudaError_t __cudampi__cpuSetDevice(int device);
-
 cudaError_t __cudampi__setDevice(int device);
 
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind);

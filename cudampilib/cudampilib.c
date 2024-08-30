@@ -362,7 +362,11 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   MPI_Allgather(&localGpuCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  
+  1 5
+  2 0 
+  3 10
+  totaldevicescount = 2
+
   int localCpuCount;
   // each process first checks its own device count
   if (cudaSuccess != __cudampi__getCpuFreeThreads(&localCpuCount)) {
@@ -388,6 +392,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     fclose(filep);
   }
 
+// TODO also consider cpu devices
   // compute the total device count
   __cudampi_totalgpudevicecount = 0;
   for (i = 0; i < __cudampi__MPIproccount; i++) {
@@ -406,6 +411,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
+
+// TODO also consider cpu devices
   __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
@@ -417,6 +424,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   // now initialize values device by device
   for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
 
+  // TODO also consider cpu devices
     __cudampi_targetGPUfordevice[i] = currentGPU;
     __cudampi_targetMPIrankfordevice[i] = currentrank;
 
@@ -563,6 +571,11 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   }
 }
 
+cudaError_t __cudampi__cudaDeviceSynchronize(void)
+{
+  return __cudampi__deviceSynchronize();
+}
+
 cudaError_t __cudampi__deviceSynchronize(void) {
 
   cudaError_t retVal;
@@ -689,20 +702,16 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
 int __cudampi__isCpu()
 {
   // TODO
-  return omp_get_thread_num() >= __cudampi_totalgpudevicecount;
-}
-
-cudaError_t __cudampi__cpuSetDevice(int device) {
-  // TODO
-  return cudaSuccess;
+  return __cudampi__currentDevice  >= __cudampi_totalgpudevicecount;
 }
 
 cudaError_t __cudampi__setDevice(int device) {
-  if (__cudampi__isCpu()) {
-    return __cudampi__cpuSetDevice(device);
+  __cudampi__currentDevice = device; // set it for the current thread
+  if (!__cudampi__isCpu()) {
+    return __cudampi__cudaSetDevice(device);
   }
   // else
-  return __cudampi__cudaSetDevice(device);
+  return cudaSuccess;
 }
 
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
