@@ -22,9 +22,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // int __cudampi__GPUcountpernode=1;
 
 int *__cudampi__GPUcountspernode;
-int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
 
 int __cudampi_localdevicecount = 0; // how many GPUs in process 0
+int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi_totalthreadcount = 0; // how many threads in process 0
 
 int *__cudampi_targetGPUfordevice;     // GPU id on a given node for device number (global)
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
@@ -230,7 +231,7 @@ int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, int ba
 
   if (deviceenabled == 1) {
 
-    #pragma omp critical
+#pragma omp critical
     {
       mycounter = *globalcounter; // handle data from mycounter to mycounter+batchsize-1
       (*globalcounter) += batchsize;
@@ -247,7 +248,7 @@ int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, int batchs
   // max is the vector size
   long long mycounter;
 
-  #pragma omp critical
+#pragma omp critical
   {
     mycounter = *globalcounter; // handle data from mycounter to mycounter+batchsize-1
     (*globalcounter) += batchsize;
@@ -259,7 +260,7 @@ int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, int batchs
 int __cudampi__isdeviceenabled(int deviceid) {
   int val;
 
-  #pragma omp atomic read
+#pragma omp atomic read
   val = __cudampi__deviceenabled[__cudampi__currentdevice[omp_get_thread_num()]];
 
   return val;
@@ -275,7 +276,7 @@ void __cudampi__getCUDAdevicescount(int *cudadevicescount) {
 
   // return from a variable
 
-  *cudadevicescount = __cudampi_totaldevicecount;
+  *cudadevicescount = __cudampi_totalthreadcount;
 }
 
 void __cudampi__initializeMPI(int argc, char **argv) {
@@ -342,13 +343,15 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   // now compute proper indexes
 
-  __cudampi_targetGPUfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  int number_of_slaves = __cudampi__MPIproccount - 1;
+  __cudampi_totalthreadcount = __cudampi_totaldevicecount + number_of_slaves;
+  __cudampi_targetGPUfordevice = (int *)malloc(__cudampi_totalthreadcount * sizeof(int));
   if (!__cudampi_targetGPUfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalthreadcount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
@@ -357,7 +360,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   int currentrank = 0;
   int currentGPU = 0;
   // now initialize values device by device
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalthreadcount; i++) {
 
     __cudampi_targetGPUfordevice[i] = currentGPU;
     __cudampi_targetMPIrankfordevice[i] = currentrank;
@@ -367,7 +370,14 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
     currentGPU++;
 
-    if (currentGPU == __cudampi__GPUcountspernode[currentrank]) {
+    if (currentrank == 0 & currentGPU == __cudampi__GPUcountspernode[currentrank]) {
+      // master and reached GPU number on master
+      currentGPU = 0;
+      currentrank++;
+    } else if (currentrank != 0 & currentGPU == __cudampi__GPUcountspernode[currentrank]) {
+      // slave and reached GPU number on slave - set targe GPU to -1 meaning CPU
+      currentGPU = -1;
+    } else if (currentGPU == -1) {
       // reset the GPU id and increase the rank
       currentGPU = 0;
       currentrank++;
@@ -387,19 +397,19 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi__amimanager[0] = 1;
 
-  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi_totalthreadcount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totalthreadcount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // set up communicators - there should be a communicator for each target GPU, each of which is shared by process 0 and process on which the target GPU resides, this is obviously not needed for local GPUs
 
-  __cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
+  __cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totalthreadcount);
   if (!__cudampi__communicators) {
     printf("\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) { // disregard local GPUs since we do not need communicators for them -- communication will be by direct invocations
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totalthreadcount; i++) { // disregard local GPUs since we do not need communicators for them -- communication will be by direct invocations
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 

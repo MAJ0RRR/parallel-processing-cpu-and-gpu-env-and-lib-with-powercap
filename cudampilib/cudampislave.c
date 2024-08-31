@@ -26,8 +26,9 @@ int *__cudampi__GPUcountspernode;
 
 MPI_Comm *__cudampi__communicators;
 
+int __cudampi_localdevicecount = 0; // how many GPUs in this slave
 int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
-int __cudampi_localdevicecount = 1;
+int __cudampi_totalthreadcount = 0; // how many threads in process 0
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
@@ -68,20 +69,20 @@ int main(int argc, char **argv) {
 
   MPI_Allgather(&__cudampi_localdevicecount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi_totalthreadcount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalthreadcount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totalthreadcount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // create communicators
   // in the case of the slave we need to go by every GPU and for each GPU there will be a separate GPU shared with the master -- process 0
 
-  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_localdevicecount);
+  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * (__cudampi_localdevicecount + 1));
   if (!__cudampi__communicators) {
     printf("\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
@@ -89,7 +90,7 @@ int main(int argc, char **argv) {
 
   int commcounter = 0;
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totalthreadcount; i++) {
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 
@@ -108,9 +109,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  // here we need to spawn threads -- each responsible for handling one local GPU
+  // here we need to spawn threads -- each responsible for handling one local GPU + one for handling CPU
 
-  #pragma omp parallel num_threads(__cudampi_localdevicecount)
+  #pragma omp parallel num_threads(__cudampi_localdevicecount + 1)
   {
 
     MPI_Status status;
