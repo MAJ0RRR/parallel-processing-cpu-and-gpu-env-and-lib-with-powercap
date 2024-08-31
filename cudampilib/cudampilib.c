@@ -362,11 +362,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   MPI_Allgather(&localGpuCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  1 5
-  2 0 
-  3 10
-  totaldevicescount = 2
-
   int localCpuCount;
   // each process first checks its own device count
   if (cudaSuccess != __cudampi__getCpuFreeThreads(&localCpuCount)) {
