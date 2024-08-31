@@ -421,7 +421,7 @@ void __cudampi__terminateMPI() {
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
-  for (int i = __cudampi_localdevicecount; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi_localdevicecount; i < __cudampi_totalthreadcount; i++) {
     MPI_Send(NULL, 0, MPI_CHAR, 1 /*__cudampi__gettargetMPIrank(i)*/, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
   }
 
