@@ -50,8 +50,6 @@ void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream);
 
 cudaError_t __cudampi__cudaGetDeviceCount(int *count);
 
-void __cudampi__getCUDAdevicescount(int *cudadevicescount);
-
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream);

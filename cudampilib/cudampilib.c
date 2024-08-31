@@ -268,15 +268,8 @@ int __cudampi__isdeviceenabled(int deviceid) {
 
 cudaError_t __cudampi__cudaGetDeviceCount(int *count) {
 
-  __cudampi__getCUDAdevicescount(count);
+  *count = __cudampi_totalthreadcount;
   return cudaSuccess;
-}
-
-void __cudampi__getCUDAdevicescount(int *cudadevicescount) {
-
-  // return from a variable
-
-  *cudadevicescount = __cudampi_totalthreadcount;
 }
 
 void __cudampi__initializeMPI(int argc, char **argv) {

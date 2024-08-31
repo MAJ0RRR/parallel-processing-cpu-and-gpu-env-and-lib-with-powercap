@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     streamcount = atoi(argv[1]);
   }
 
-  __cudampi__getCUDAdevicescount(&cudadevicescount);
+  __cudampi__cudaGetDeviceCount(&cudadevicescount);
 
   cudaHostAlloc((void **)&vectora, sizeof(double) * VECTORSIZE, cudaHostAllocDefault);
   if (!vectora) {
