@@ -116,10 +116,6 @@ int main(int argc, char **argv) {
 
     MPI_Status status;
 
-    // set the active GPU
-
-    cudaSetDevice(omp_get_thread_num());
-
     // following communication needs to use dedicated communicators, not MPI_COMM_WORLD!
 
     do {

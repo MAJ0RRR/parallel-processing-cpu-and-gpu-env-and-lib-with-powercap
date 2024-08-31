@@ -592,15 +592,20 @@ cudaError_t __cudampi__cudaDeviceSynchronize(void) {
 
 cudaError_t __cudampi__cudaSetDevice(int device) {
 
-  __cudampi__currentdevice[omp_get_thread_num()] = device; // set it for the current thread
+  __cudampi__currentdevice[device] = device; // set it for the current thread
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi__currentdevice[device] < __cudampi__GPUcountspernode[0]) { // run locally
     return cudaSetDevice(device);
   } else { // set device remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[device]);
+    int targetdevice = __cudampi__currentdevice[device] // which GPU on targetrank node or -1 if CPU
 
-    int sdata = __cudampi__gettargetGPU(__cudampi__currentdevice[omp_get_thread_num()]); // compute the target GPU id
+    if (targetdevice == -1){
+      return cudaSuccess;
+    }
+
+    int sdata = __cudampi__gettargetGPU(__cudampi__currentdevice[device]); // compute the target GPU id
 
     MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
 
