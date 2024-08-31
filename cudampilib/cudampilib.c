@@ -21,14 +21,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 // int __cudampi__GPUcountpernode=1;
 
-
 #define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
 
+#define  __cudampi__isLocalCpu omp_get_thread_num() == __cudampi_totalgpudevicecount
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
 
 int *__cudampi__GPUcountspernode;
+int *__cudampi__freeThreadsPerNode;
 int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi_totalcpudevicecount = 0; // how many CPUs in total (on all considered nodes)
 
 int __cudampi_localdevicecount = 0; // how many GPUs in process 0
 
@@ -271,17 +273,48 @@ int __cudampi__isdeviceenabled(int deviceid) {
   return val;
 }
 
+cudaError_t __cudampi__getDeviceCount(int *count) {
+  int cpuDevicesCount = 0;
+  int gpuDevicesCount = 0;
+
+  __cudampi__cudaGetDeviceCount(&cpuDevicesCount);
+  __cudampi__cpuGetDeviceCount(&cpuDevicesCount);
+
+  *count = cpuDevicesCount + gpuDevicesCount;
+  return cudaSuccess;
+}
+
 cudaError_t __cudampi__cudaGetDeviceCount(int *count) {
 
   __cudampi__getCUDAdevicescount(count);
   return cudaSuccess;
 }
 
+cudaError_t __cudampi__cpuGetDeviceCount(int *count) {
+
+  __cudampi__getCPUdevicescount(count);
+  return cudaSuccess;
+}
+
+
 void __cudampi__getCUDAdevicescount(int *cudadevicescount) {
 
   // return from a variable
 
   *cudadevicescount = __cudampi_totalgpudevicecount;
+}
+
+void __cudampi__getCPUdevicescount(int *cpudevicescount) {
+
+  // return from a variable
+
+  *cpudevicescount = __cudampi_totalcpudevicecount;
+}
+
+cudaError_t __cudampi__getCpuFreeThreads(int* count)
+{
+  // TODO
+  return 0;
 }
 
 void __cudampi__initializeMPI(int argc, char **argv) {
@@ -310,6 +343,12 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
+  __cudampi__freeThreadsPerNode = (int *)malloc(sizeof(int) * __cudampi__MPIproccount);
+  if (!__cudampi__freeThreadsPerNode) {
+    printf("\nNot enough memory");
+    exit(-1); // we could exit in a nicer way! TBD
+  }
+
   // initialize the array -- for simplicity first try to use all available GPUs in all nodes -- query the nodes
 
   int localGpuCount;
@@ -321,6 +360,17 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   MPI_Allgather(&localGpuCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
+
+  int localCpuCount;
+  // each process first checks its own device count
+  if (cudaSuccess != __cudampi__getCpuFreeThreads(&localCpuCount)) {
+    printf("Error invoking __cudampi__getCpuFreeThreads()");
+    fflush(stdout);
+    exit(-1);
+  }
+  // TODO: fill this variable
+
+  MPI_Allgather(&localCpuCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
 
   // check if there is a configuration file
   FILE *filep = fopen("__cudampi.conf", "r");
@@ -336,6 +386,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     fclose(filep);
   }
 
+// TODO also consider cpu devices
   // compute the total device count
   __cudampi_totalgpudevicecount = 0;
   for (i = 0; i < __cudampi__MPIproccount; i++) {
@@ -354,6 +405,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
+
+// TODO also consider cpu devices
   __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
@@ -365,6 +418,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   // now initialize values device by device
   for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
 
+  // TODO also consider cpu devices
     __cudampi_targetGPUfordevice[i] = currentGPU;
     __cudampi_targetMPIrankfordevice[i] = currentrank;
 
@@ -472,6 +526,19 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
     return ((cudaError_t)(rdata + sizeof(void *)));
   }
 }
+cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
+  // TODO
+  return cudaSuccess;
+}
+
+cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
+  if (__cudampi__isCpu()) {
+    return __cudampi__cpuMalloc(devPtr, size);
+  }
+  // else
+  return __cudampi__cudaMalloc(devPtr, size);
+}
+
 
 cudaError_t __cudampi__cudaFree(void *devPtr) {
   // as for cudaMalloc but just free
@@ -496,6 +563,11 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
 
     return ((cudaError_t)rdata);
   }
+}
+
+cudaError_t __cudampi__cudaDeviceSynchronize(void)
+{
+  return __cudampi__deviceSynchronize();
 }
 
 cudaError_t __cudampi__deviceSynchronize(void) {
@@ -529,8 +601,13 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       }
     }
   }
-
-  if (__cudampi_isLocalGpu) { // run locally
+  if (__cudampi__isLocalCpu) { // run CPU synchronization locally
+    // TODO
+    // compute power
+    // wait for computations to finish
+  } else if (__cudampi__isCpu()) { // run CPU synchronization remotely
+    // TODO
+  } else if (__cudampi_isLocalGpu) { // run GPU synchronization locally
 
     // now get power measurement - this should be OK as we assume that computations might be taking place
 
@@ -541,7 +618,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
     retVal = cudaDeviceSynchronize();
-  } else { // run synchronization remotely
+  } else { // run GPU synchronization remotely
 
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
@@ -616,6 +693,21 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
   }
 }
 
+int __cudampi__isCpu()
+{
+  // TODO
+  return __cudampi__currentDevice  >= __cudampi_totalgpudevicecount;
+}
+
+cudaError_t __cudampi__setDevice(int device) {
+  __cudampi__currentDevice = device; // set it for the current thread
+  if (!__cudampi__isCpu()) {
+    return __cudampi__cudaSetDevice(device);
+  }
+  // else
+  return cudaSuccess;
+}
+
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 
   if (__cudampi_isLocalGpu) { // run locally
@@ -660,6 +752,11 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
 
     return ((cudaError_t)rdata);
   }
+}
+
+cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+  // TODO
+  return cudaSuccess;
 }
 
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
@@ -710,6 +807,10 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
   }
 }
 
+cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+  return cudaSuccess;
+}
+
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 
 void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream) {
@@ -755,6 +856,17 @@ void __cudampi__kernel(void *devPtr) {
     unsigned char rdata[rsize];
 
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
+  }
+}
+
+void cpukernel(void *devPtr, int num_threads);
+
+void __cudampi__cpuKernel(void *devPtr){
+
+  if (__cudampi__isLocalCpu) { // run locally
+    cpukernel(devPtr, __cudampi__freeThreadsPerNode[0]);
+  } else { // launch remotely
+    // TODO
   }
 }
 
