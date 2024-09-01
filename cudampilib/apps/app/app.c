@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
   int cudadevicescount = 1;
 
-  __cudampi__getCUDAdevicescount(&cudadevicescount);
+  __cudampi__cudaGetDeviceCount(&cudadevicescount);
 
   #pragma omp parallel num_threads(cudadevicescount)
   {
