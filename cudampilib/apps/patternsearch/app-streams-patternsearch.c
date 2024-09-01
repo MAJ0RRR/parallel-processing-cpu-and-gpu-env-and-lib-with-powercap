@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     __cudampi__setglobalpowerlimit(powerlimit);
   }
 
-  __cudampi__getCUDAdevicescount(&cudadevicescount);
+  __cudampi__cudaGetDeviceCount(&cudadevicescount);
 
   cudaHostAlloc((void **)&vectora, sizeof(char) * (VECTORSIZE + PATTERNLENGTH), cudaHostAllocDefault);
   if (!vectora) {
