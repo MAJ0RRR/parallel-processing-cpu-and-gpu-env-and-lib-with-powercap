@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
     __cudampi__cudaMemcpy(tab + 2048, devPtr, 2048, cudaMemcpyDeviceToHost);
 
-    __cudampi__cudaDeviceSynchronize();
+    __cudampi__deviceSynchronize();
 
     for (i = 2048; i < 4096; i++) {
       printf("\n ind[%d]=%d", i, (int)(tab[i]));

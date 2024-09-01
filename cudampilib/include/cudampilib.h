@@ -28,29 +28,48 @@ void __cudampi__initializeMPI(int argc, char **argv);
 
 void __cudampi__terminateMPI();
 
+int __cudampi__isCpu();
+
 int __cudampi__gettargetGPU(int device);
 
 int __cudampi__gettargetMPIrank(int device);
 
 cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size);
 
+cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size);
+
+cudaError_t __cudampi__malloc(void **devPtr, size_t size);
+
 cudaError_t __cudampi__cudaFree(void *devPtr);
 
-cudaError_t __cudampi__cudaDeviceSynchronize(void);
+cudaError_t __cudampi__deviceSynchronize(void);
 
 cudaError_t __cudampi__cudaSetDevice(int device);
 
+cudaError_t __cudampi__setDevice(int device);
+
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind);
 
+cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind);
+
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream);
+
+cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind);
 
 void __cudampi__kernel(void *devPtr);
 
 void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream);
 
+void __cudampi__cpuKernel(void *devPtr);
+
 cudaError_t __cudampi__cudaGetDeviceCount(int *count);
 
+cudaError_t __cudampi__cpuGetDeviceCount(int *count);
+
+cudaError_t  __cudampi__getDeviceCount (int *count);
+
 void __cudampi__getCUDAdevicescount(int *cudadevicescount);
+void __cudampi__getCPUdevicescount(int *cudadevicescount);
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 

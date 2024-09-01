@@ -149,12 +149,12 @@ int main(int argc, char **argv) {
 
       privatecounter++;
       if (privatecounter % 30) {
-        __cudampi__cudaDeviceSynchronize();
+        __cudampi__deviceSynchronize();
       }
 
     } while (!finish);
 
-    __cudampi__cudaDeviceSynchronize();
+    __cudampi__deviceSynchronize();
     __cudampi__cudaStreamDestroy(stream1);
   }
 

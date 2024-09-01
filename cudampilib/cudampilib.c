@@ -498,7 +498,7 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   }
 }
 
-cudaError_t __cudampi__cudaDeviceSynchronize(void) {
+cudaError_t __cudampi__deviceSynchronize(void) {
 
   cudaError_t retVal;
   static int selecteddevices = 0; // only updated by thread 0

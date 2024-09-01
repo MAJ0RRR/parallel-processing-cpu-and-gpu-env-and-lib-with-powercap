@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
 
       privatecounter++;
       if (privatecounter % 2) {
-        __cudampi__cudaDeviceSynchronize();
+        __cudampi__deviceSynchronize();
         //    printf("\nthread %d sync mycounter=%d",omp_get_thread_num(),mycounter);
         //     fflush(stdout);
       }
@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
     }
     */
 
-    __cudampi__cudaDeviceSynchronize();
+    __cudampi__deviceSynchronize();
 
     __cudampi__cudaStreamDestroy(stream1);
 
