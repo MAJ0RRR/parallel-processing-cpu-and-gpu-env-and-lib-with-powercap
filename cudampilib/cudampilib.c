@@ -23,8 +23,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
-
-#define  __cudampi__isLocalCpu omp_get_thread_num() == __cudampi_totalgpudevicecount
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
 
 
@@ -601,11 +599,9 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       }
     }
   }
-  if (__cudampi__isLocalCpu) { // run CPU synchronization locally
-    // TODO
-    // compute power
-    // wait for computations to finish
-  } else if (__cudampi__isCpu()) { // run CPU synchronization remotely
+
+  if (__cudampi__isCpu()) { // run CPU synchronization remotely
+    // wyjebać local cpu
     // TODO
   } else if (__cudampi_isLocalGpu) { // run GPU synchronization locally
 
