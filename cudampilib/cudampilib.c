@@ -21,8 +21,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 // int __cudampi__GPUcountpernode=1;
 
+
+#define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
+#define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
+
+#define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
+
 int *__cudampi__GPUcountspernode;
-int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
 
 int __cudampi_localdevicecount = 0; // how many GPUs in process 0
 
@@ -69,16 +75,16 @@ float __cudampi__gettotalpowerofselecteddevices() { // gets total power of curre
 
   omp_set_lock(&deviceselectionlock);
 
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] == 1) {
       curpower = __cudampi__devicepower[__cudampi__currentdevice[i]];
       if (curpower == (-1)) {
 
-        for (int i = 0; i < __cudampi_totaldevicecount; i++) {
+        for (int i = 0; i < __cudampi_totalgpudevicecount; i++) {
           omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
         }
 
@@ -89,7 +95,7 @@ float __cudampi__gettotalpowerofselecteddevices() { // gets total power of curre
     }
   }
 
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
@@ -121,7 +127,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   // this will be invoked from one thread typically
   printf("\naaa");
   fflush(stdout);
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     printf("\nsetting lock on %d %d", i, __cudampi__currentdevice[i]);
     fflush(stdout);
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
@@ -132,7 +138,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
 
   // check of all the devices has been set power
   int allpowerset = 1;
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     if (__cudampi__devicepower[__cudampi__currentdevice[i]] == (-1)) {
       allpowerset = 0;
       break;
@@ -143,7 +149,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     // unlock and quit
     printf("before unlocking");
     fflush(stdout);
-    for (i = 0; i < __cudampi_totaldevicecount; i++) {
+    for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
       omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
     }
     printf("not all set");
@@ -154,7 +160,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     return 0;
   }
 
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] == 1) {
       __cudampi__deviceenabled[__cudampi__currentdevice[i]] = -1; // candidate for selection
     }
@@ -168,7 +174,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   do {
     curperfpower = 0;
     indexselected = -1;
-    for (i = 0; i < __cudampi_totaldevicecount; i++) {
+    for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
           ((temp = (computeDevPerformance(__cudampi__time[__cudampi__currentdevice[i]]) / __cudampi__devicepower[__cudampi__currentdevice[i]])) > curperfpower)) {
         curperfpower = temp;
@@ -197,14 +203,14 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   }
 
   // now not enabled devices are set to 0
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] != 1) {
       __cudampi__deviceenabled[__cudampi__currentdevice[i]] = 0;
     }
   }
 
   // unlock the devices' locks
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
@@ -224,9 +230,9 @@ int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, int ba
   long long mycounter;
   int deviceenabled;
 
-  omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
-  deviceenabled = __cudampi__deviceenabled[__cudampi__currentdevice[omp_get_thread_num()]];
-  omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
+  omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+  deviceenabled = __cudampi__deviceenabled[__cudampi__currentDevice];
+  omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
   if (deviceenabled == 1) {
 
@@ -260,7 +266,7 @@ int __cudampi__isdeviceenabled(int deviceid) {
   int val;
 
   #pragma omp atomic read
-  val = __cudampi__deviceenabled[__cudampi__currentdevice[omp_get_thread_num()]];
+  val = __cudampi__deviceenabled[__cudampi__currentDevice];
 
   return val;
 }
@@ -275,7 +281,7 @@ void __cudampi__getCUDAdevicescount(int *cudadevicescount) {
 
   // return from a variable
 
-  *cudadevicescount = __cudampi_totaldevicecount;
+  *cudadevicescount = __cudampi_totalgpudevicecount;
 }
 
 void __cudampi__initializeMPI(int argc, char **argv) {
@@ -306,15 +312,15 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   // initialize the array -- for simplicity first try to use all available GPUs in all nodes -- query the nodes
 
-  int localcount;
+  int localGpuCount;
   // each process first checks its own device count
-  if (cudaSuccess != cudaGetDeviceCount(&localcount)) {
+  if (cudaSuccess != cudaGetDeviceCount(&localGpuCount)) {
     printf("Error invoking cudaGetDeviceCount()");
     fflush(stdout);
     exit(-1);
   }
 
-  MPI_Allgather(&localcount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&localGpuCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
   // check if there is a configuration file
   FILE *filep = fopen("__cudampi.conf", "r");
@@ -331,9 +337,9 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   // compute the total device count
-  __cudampi_totaldevicecount = 0;
+  __cudampi_totalgpudevicecount = 0;
   for (i = 0; i < __cudampi__MPIproccount; i++) {
-    __cudampi_totaldevicecount += __cudampi__GPUcountspernode[i];
+    __cudampi_totalgpudevicecount += __cudampi__GPUcountspernode[i];
     printf("\nOn node %d using %d GPUs.", i, __cudampi__GPUcountspernode[i]);
   }
   printf("\n");
@@ -342,13 +348,13 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   // now compute proper indexes
 
-  __cudampi_targetGPUfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetGPUfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
   if (!__cudampi_targetGPUfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
@@ -357,7 +363,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   int currentrank = 0;
   int currentGPU = 0;
   // now initialize values device by device
-  for (i = 0; i < __cudampi_totaldevicecount; i++) {
+  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
 
     __cudampi_targetGPUfordevice[i] = currentGPU;
     __cudampi_targetMPIrankfordevice[i] = currentrank;
@@ -387,19 +393,19 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi__amimanager[0] = 1;
 
-  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi_totalgpudevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totalgpudevicecount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // set up communicators - there should be a communicator for each target GPU, each of which is shared by process 0 and process on which the target GPU resides, this is obviously not needed for local GPUs
 
-  __cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
+  __cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totalgpudevicecount);
   if (!__cudampi__communicators) {
     printf("\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) { // disregard local GPUs since we do not need communicators for them -- communication will be by direct invocations
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totalgpudevicecount; i++) { // disregard local GPUs since we do not need communicators for them -- communication will be by direct invocations
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 
@@ -418,7 +424,7 @@ void __cudampi__terminateMPI() {
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
-  for (int i = __cudampi_localdevicecount; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi_localdevicecount; i < __cudampi_totalgpudevicecount; i++) {
     MPI_Send(NULL, 0, MPI_CHAR, 1 /*__cudampi__gettargetMPIrank(i)*/, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
   }
 
@@ -441,7 +447,7 @@ int __cudampi__gettargetMPIrank(int device) {
 
 cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaMalloc(devPtr, size);
   } else { // allocate remotely
 
@@ -449,17 +455,17 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 
     // request allocation on the other node
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     unsigned long sdata = size; // how many bytes to allocate on the GPU
 
-    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(void *) + sizeof(cudaError_t);
     // receive confirmation with the actual pointer
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCRESP, __cudampi__currentCommunicator, NULL);
 
     *devPtr = *((void **)rdata);
 
@@ -470,23 +476,23 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 cudaError_t __cudampi__cudaFree(void *devPtr) {
   // as for cudaMalloc but just free
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaFree(devPtr);
   } else { // allocate remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     int ssize = sizeof(void *);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREERESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
@@ -500,9 +506,9 @@ cudaError_t __cudampi__cudaDeviceSynchronize(void) {
 
   // if ((powermeasurecounter[omp_get_thread_num()]%10)==4) {
 
-  omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
-  amimanager = __cudampi__amimanager[__cudampi__currentdevice[omp_get_thread_num()]];
-  omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
+  omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+  amimanager = __cudampi__amimanager[__cudampi__currentDevice];
+  omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
   if (amimanager) {
     if (__cudampi__isglobalpowerlimitset) {
@@ -524,43 +530,43 @@ cudaError_t __cudampi__cudaDeviceSynchronize(void) {
     }
   }
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
 
     // now get power measurement - this should be OK as we assume that computations might be taking place
 
     //   if ((powermeasurecounter[omp_get_thread_num()]%10)==4) {
 
-    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
-    __cudampi__devicepower[__cudampi__currentdevice[omp_get_thread_num()]] = getGPUpower(__cudampi__currentdevice[omp_get_thread_num()]);
-    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
+    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+    __cudampi__devicepower[__cudampi__currentDevice] = getGPUpower(__cudampi__currentDevice);
+    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
     retVal = cudaDeviceSynchronize();
   } else { // run synchronization remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     int sdata; // if 0 then means do not measure power, if 1 do measure on the slave side
                //    if ((powermeasurecounter[omp_get_thread_num()]%10)==4)
     sdata = 1;
     //    else sdata=0;
 
-    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
     // receive an error message and a float representing power consumption
 
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
 
     // decode and store power consumption for the device
 
     float power = *((float *)(rdata + sizeof(cudaError_t)));
 
     if (power != (-1)) {
-      omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
-      __cudampi__devicepower[__cudampi__currentdevice[omp_get_thread_num()]] = power;
-      omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
+      omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+      __cudampi__devicepower[__cudampi__currentDevice] = power;
+      omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
     }
 
     retVal = ((cudaError_t)rdata);
@@ -569,19 +575,19 @@ cudaError_t __cudampi__cudaDeviceSynchronize(void) {
   powermeasurecounter[omp_get_thread_num()]++;
 
   // record time
-  if (__cudampi__timemeasured[__cudampi__currentdevice[omp_get_thread_num()]]) {
-    gettimeofday(&(__cudampi__timestop[__cudampi__currentdevice[omp_get_thread_num()]]), NULL);
+  if (__cudampi__timemeasured[__cudampi__currentDevice]) {
+    gettimeofday(&(__cudampi__timestop[__cudampi__currentDevice]), NULL);
 
-    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
-    __cudampi__time[__cudampi__currentdevice[omp_get_thread_num()]].tv_sec = __cudampi__timestop[__cudampi__currentdevice[omp_get_thread_num()]].tv_sec - __cudampi__timestart[__cudampi__currentdevice[omp_get_thread_num()]].tv_sec;    // compute current time
-    __cudampi__time[__cudampi__currentdevice[omp_get_thread_num()]].tv_usec = __cudampi__timestop[__cudampi__currentdevice[omp_get_thread_num()]].tv_usec - __cudampi__timestart[__cudampi__currentdevice[omp_get_thread_num()]].tv_usec; // compute current time
-    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[omp_get_thread_num()]]));
+    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+    __cudampi__time[__cudampi__currentDevice].tv_sec = __cudampi__timestop[__cudampi__currentDevice].tv_sec - __cudampi__timestart[__cudampi__currentDevice].tv_sec;    // compute current time
+    __cudampi__time[__cudampi__currentDevice].tv_usec = __cudampi__timestop[__cudampi__currentDevice].tv_usec - __cudampi__timestart[__cudampi__currentDevice].tv_usec; // compute current time
+    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
-    __cudampi__timestart[__cudampi__currentdevice[omp_get_thread_num()]] = __cudampi__timestop[__cudampi__currentdevice[omp_get_thread_num()]];
+    __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
 
   } else {
-    __cudampi__timemeasured[__cudampi__currentdevice[omp_get_thread_num()]] = 1;
-    gettimeofday(&(__cudampi__timestart[__cudampi__currentdevice[omp_get_thread_num()]]), NULL);
+    __cudampi__timemeasured[__cudampi__currentDevice] = 1;
+    gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);
   }
 
   return retVal;
@@ -589,22 +595,22 @@ cudaError_t __cudampi__cudaDeviceSynchronize(void) {
 
 cudaError_t __cudampi__cudaSetDevice(int device) {
 
-  __cudampi__currentdevice[omp_get_thread_num()] = device; // set it for the current thread
+  __cudampi__currentDevice = device; // set it for the current thread
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaSetDevice(device);
   } else { // set device remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-    int sdata = __cudampi__gettargetGPU(__cudampi__currentdevice[omp_get_thread_num()]); // compute the target GPU id
+    int sdata = __cudampi__gettargetGPU(__cudampi__currentDevice); // compute the target GPU id
 
-    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICERESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
@@ -612,11 +618,11 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
 
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaMemcpy(dst, src, count, kind);
   } else if (kind == cudaMemcpyHostToDevice) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + count;
     unsigned char sdata[ssize];
@@ -624,18 +630,18 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
     *((void **)sdata) = dst;
     memcpy(sdata + sizeof(void *), src, count); // copy input data
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long);
     unsigned char sdata[ssize];
@@ -643,12 +649,12 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
@@ -658,11 +664,11 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
 
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaMemcpyAsync(dst, src, count, kind, stream);
   } else if (kind == cudaMemcpyHostToDevice) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(cudaStream_t) + count;
     unsigned char sdata[ssize];
@@ -671,18 +677,18 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
     memcpy(sdata + sizeof(void *) + sizeof(cudaStream_t), src, count); // copy input data
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t);
     unsigned char sdata[ssize];
@@ -691,12 +697,12 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
     *((cudaStream_t *)(sdata + sizeof(void *) + sizeof(unsigned long))) = stream;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
@@ -708,23 +714,23 @@ void launchkernelinstream(void *devPtr, cudaStream_t stream);
 
 void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     launchkernelinstream(devPtr, stream);
   } else { // launch remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(cudaStream_t);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__currentCommunicator, NULL);
   }
 }
 
@@ -732,45 +738,45 @@ void launchkernel(void *devPtr);
 
 void __cudampi__kernel(void *devPtr) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     launchkernel(devPtr);
   } else { // launch remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
   }
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaStreamCreate(pStream);
   } else { // create a stream remotely
 
     // we then return the actual pointer from another node -- it is used only on that node
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     // send an empty message -- there is no need for input data
-    MPI_Send(NULL, 0, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATEREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send(NULL, 0, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATEREQ, __cudampi__currentCommunicator);
 
     // get a pointer to the newly created stream + an error message
     int rsize = sizeof(cudaStream_t) + sizeof(cudaError_t);
     // receive confirmation with the actual pointer
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATERESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATERESP, __cudampi__currentCommunicator, NULL);
 
     *pStream = *((cudaStream_t *)rdata);
 
@@ -780,23 +786,23 @@ cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
 
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream) {
 
-  if (__cudampi__currentdevice[omp_get_thread_num()] < __cudampi__GPUcountspernode[0]) { // run locally
+  if (__cudampi_isLocalGpu) { // run locally
     return cudaStreamDestroy(stream);
   } else { // destroy remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentdevice[omp_get_thread_num()]);
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     int ssize = sizeof(cudaStream_t);
     unsigned char sdata[ssize];
 
     *((cudaStream_t *)sdata) = stream;
 
-    MPI_Send((unsigned char *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYREQ, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]]);
+    MPI_Send((unsigned char *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYRESP, __cudampi__communicators[__cudampi__currentdevice[omp_get_thread_num()]], NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYRESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
