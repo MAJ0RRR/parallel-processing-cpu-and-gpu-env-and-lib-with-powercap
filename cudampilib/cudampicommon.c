@@ -34,3 +34,9 @@ float getGPUpower(int gpuid) {
 
   return power;
 }
+
+cudaError_t __cudampi__getCpuFreeThreads(int* count)
+{
+  // TODO
+  return 0;
+}

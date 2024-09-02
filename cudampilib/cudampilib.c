@@ -31,7 +31,8 @@ int __cudampi_totaldevicecount = 0; // how many GPUs + CPUs (on all considered n
 int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
 int __cudampi_totalcpudevicecount = 0; // how many CPUs in total (on all considered nodes)
 
-int __cudampi_localdevicecount = 0; // how many GPUs in process 0
+int __cudampi__localGpuDeviceCount = 0; // how many GPUs in process 0
+int __cudampi__localFreeThreadCount = 0;
 
 int *__cudampi_targetGPUfordevice;     // GPU id on a given node for device number (global)
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
@@ -288,13 +289,6 @@ cudaError_t __cudampi__cpuGetDeviceCount(int *count) {
   return cudaSuccess;
 }
 
-
-cudaError_t __cudampi__getCpuFreeThreads(int* count)
-{
-  // TODO
-  return 0;
-}
-
 void __cudampi__initializeMPI(int argc, char **argv) {
 
   int mtsprovided;
@@ -329,26 +323,24 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   // initialize the array -- for simplicity first try to use all available GPUs in all nodes -- query the nodes
 
-  int localGpuCount;
   // each process first checks its own device count
-  if (cudaSuccess != cudaGetDeviceCount(&localGpuCount)) {
+  if (cudaSuccess != cudaGetDeviceCount(&__cudampi__localGpuDeviceCount)) {
     printf("Error invoking cudaGetDeviceCount()");
     fflush(stdout);
     exit(-1);
   }
 
-  MPI_Allgather(&localGpuCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  int localCpuCount;
   // each process first checks its own device count
-  if (cudaSuccess != __cudampi__getCpuFreeThreads(&localCpuCount)) {
+  if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
     printf("Error invoking __cudampi__getCpuFreeThreads()");
     fflush(stdout);
     exit(-1);
   }
   // TODO: fill this variable
 
-  MPI_Allgather(&localCpuCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
+  MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
 
   // check if there is a configuration file
   FILE *filep = fopen("__cudampi.conf", "r");
@@ -380,7 +372,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   printf("\n");
   fflush(stdout);
-  __cudampi_localdevicecount = __cudampi__GPUcountspernode[0];
 
   // now compute proper indexes
 
@@ -475,7 +466,7 @@ void __cudampi__terminateMPI() {
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
-  for (int i = __cudampi_localdevicecount; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi__localGpuDeviceCount; i < __cudampi_totaldevicecount; i++) {
     MPI_Send(NULL, 0, MPI_CHAR, 1 /*__cudampi__gettargetMPIrank(i)*/, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
   }
 
