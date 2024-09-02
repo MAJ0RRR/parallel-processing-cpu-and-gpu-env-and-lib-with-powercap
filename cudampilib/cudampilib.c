@@ -113,7 +113,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   int i;
   float powerleft;
   int indexselected;
-  float curperfpower, temp;
+  float curperfpower;
   int anydeviceenabled = 0;
 
   printf("\nbefore");
@@ -182,7 +182,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     for (i = 0; i < __cudampi_totaldevicecount; i++) {
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
           (__cudampi__deviceEnergyUsed[i] > curperfpower)) {
-        curperfpower = temp;
+        curperfpower = __cudampi__deviceEnergyUsed[i];
         indexselected = i;
         anydeviceenabled = 1;
       }
