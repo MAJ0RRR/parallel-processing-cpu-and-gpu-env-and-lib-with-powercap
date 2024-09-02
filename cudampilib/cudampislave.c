@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   // create communicators
   // in the case of the slave we need to go by every GPU and for each GPU there will be a separate GPU shared with the master -- process 0
 
-  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi__localGpuDeviceCount);
+  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
   if (!__cudampi__communicators) {
     printf("\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
