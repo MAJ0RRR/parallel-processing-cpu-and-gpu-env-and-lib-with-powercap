@@ -21,6 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
 
+float lastEnergyMeasured = 0.0;
+
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
@@ -192,6 +194,29 @@ int main(int argc, char **argv) {
         *((float *)(sdata + sizeof(cudaError_t))) = (measurepower ? getGPUpower(device) : -1); // -1 if not measured
 
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ) {
+
+        int measurepower;
+
+        MPI_Recv(&measurepower, 1, MPI_INT, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        // perform power measurement and attach it to the response
+
+        size_t ssize = sizeof(cudaError_t) + sizeof(float);
+        unsigned char sdata[ssize];
+
+        // TODO 
+        //int device;
+        ///cudaGetDevice(&device);
+
+        // cudaError_t e = cudaDeviceSynchronize();
+        // *((cudaError_t *)sdata) = e;
+
+        *((float *)(sdata + sizeof(cudaError_t))) = (measurepower ? getCpuEnergyUsed(&lastEnergyMeasured) : -1); // -1 if not measured
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISETDEVICEREQ) {

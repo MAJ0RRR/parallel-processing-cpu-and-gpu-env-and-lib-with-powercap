@@ -50,6 +50,8 @@ struct timeval __cudampi__time[__CUDAMPI_MAX_THREAD_COUNT];      // last time me
 int __cudampi__timemeasured[__CUDAMPI_MAX_THREAD_COUNT] = {0};   // whether time measurement started
 float __cudampi__devicepower[__CUDAMPI_MAX_THREAD_COUNT];        // current power taken by a device
 
+float __cudampi__deviceEnergyUsed[__CUDAMPI_MAX_THREAD_COUNT = {0}]; // energy used by the device between measurements
+
 int __cudampi__deviceenabled[__CUDAMPI_MAX_THREAD_COUNT]; // whether the given device is enabled for further use
 
 omp_lock_t __cudampi__devicelocks[__CUDAMPI_MAX_THREAD_COUNT]; // locks that guard writing to and reading from power and time values for particular devices
@@ -78,16 +80,16 @@ float __cudampi__gettotalpowerofselecteddevices() { // gets total power of curre
 
   omp_set_lock(&deviceselectionlock);
 
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] == 1) {
       curpower = __cudampi__devicepower[__cudampi__currentdevice[i]];
       if (curpower == (-1)) {
 
-        for (int i = 0; i < __cudampi_totalgpudevicecount; i++) {
+        for (int i = 0; i < __cudampi_totaldevicecount; i++) {
           omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
         }
 
@@ -98,7 +100,7 @@ float __cudampi__gettotalpowerofselecteddevices() { // gets total power of curre
     }
   }
 
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
@@ -130,7 +132,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   // this will be invoked from one thread typically
   printf("\naaa");
   fflush(stdout);
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     printf("\nsetting lock on %d %d", i, __cudampi__currentdevice[i]);
     fflush(stdout);
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
@@ -141,7 +143,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
 
   // check of all the devices has been set power
   int allpowerset = 1;
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     if (__cudampi__devicepower[__cudampi__currentdevice[i]] == (-1)) {
       allpowerset = 0;
       break;
@@ -152,7 +154,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     // unlock and quit
     printf("before unlocking");
     fflush(stdout);
-    for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+    for (i = 0; i < __cudampi_totaldevicecount; i++) {
       omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
     }
     printf("not all set");
@@ -163,7 +165,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     return 0;
   }
 
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] == 1) {
       __cudampi__deviceenabled[__cudampi__currentdevice[i]] = -1; // candidate for selection
     }
@@ -177,9 +179,9 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   do {
     curperfpower = 0;
     indexselected = -1;
-    for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+    for (i = 0; i < __cudampi_totaldevicecount; i++) {
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
-          ((temp = (computeDevPerformance(__cudampi__time[__cudampi__currentdevice[i]]) / __cudampi__devicepower[__cudampi__currentdevice[i]])) > curperfpower)) {
+          (__cudampi__deviceEnergyUsed[i] > curperfpower)) {
         curperfpower = temp;
         indexselected = i;
         anydeviceenabled = 1;
@@ -206,14 +208,14 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   }
 
   // now not enabled devices are set to 0
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] != 1) {
       __cudampi__deviceenabled[__cudampi__currentdevice[i]] = 0;
     }
   }
 
   // unlock the devices' locks
-  for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
+  for (i = 0; i < __cudampi_totaldevicecount; i++) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
@@ -414,8 +416,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   currentrank = 0;
   for (i = __cudampi_totalgpudevicecount; i < __cudampi_totaldevicecount; i++) {
 
-  // TODO also consider cpu devices
+    // TODO also consider cpu devices
     __cudampi_targetGPUfordevice[i] = -1;
+    __cudampi__devicepower[i] = -1; // initial value
+    __cudampi__deviceenabled[i] = 1;
     while (__cudampi__freeThreadsPerNode[i] <= 0)
     {
       // skip all nodes with no free threads;
@@ -604,32 +608,47 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
     retVal = cudaDeviceSynchronize();
-  } else { // run GPU synchronization remotely
+  } else { // run synchronization remotely
 
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-    int sdata; // if 0 then means do not measure power, if 1 do measure on the slave side
-               //    if ((powermeasurecounter[omp_get_thread_num()]%10)==4)
-    sdata = 1;
-    //    else sdata=0;
-
-    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
-
-    // receive an error message and a float representing power consumption
-
+    int sdata = 1; // if 0 then means do not measure power, if 1 do measure on the slave side
+    float energy = -1, power = -1;
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
 
-    // decode and store power consumption for the device
+    if (__cudampi__isCpu())
+    {
+      MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
-    float power = *((float *)(rdata + sizeof(cudaError_t)));
+      // receive an error message and a float representing power consumption
 
-    if (power != (-1)) {
-      omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-      __cudampi__devicepower[__cudampi__currentDevice] = power;
-      omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+
+      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
+
+      // decode and store power consumption for the device
+
+      energy = *((float *)(rdata + sizeof(cudaError_t)));
+      __cudampi__deviceEnergyUsed[__cudampi__currentDevice] = energy;
+    }
+    else
+    {
+      MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
+
+      // receive an error message and a float representing power consumption
+
+      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
+
+      // decode and store power consumption for the device
+
+      power = *((float *)(rdata + sizeof(cudaError_t)));
+
+      if (power != (-1)) {
+        omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+        __cudampi__devicepower[__cudampi__currentDevice] = power;
+        omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+      }
     }
 
     retVal = ((cudaError_t)rdata);
@@ -648,6 +667,10 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
 
+    if (!__cudampi__isCpu()){
+      // time and power are already measured, so it's possible to compute energy used by the device
+      __cudampi__deviceEnergyUsed[__cudampi__currentDevice] = computeDevPerformance(__cudampi__time[__cudampi__currentDevice]) / __cudampi__devicepower[__cudampi__currentDevice]
+    }
   } else {
     __cudampi__timemeasured[__cudampi__currentDevice] = 1;
     gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);

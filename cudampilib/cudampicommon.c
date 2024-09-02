@@ -40,3 +40,14 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   // TODO
   return 0;
 }
+
+float getCpuEnergyUsed(float* lastEnergyMeasured) {
+  // compute energy used from last energy measurement and update the variable
+  float measured = 0.0 // TODO, get it from sysfs or MSR (Pkg Energy 0x611)
+  
+  float diff = measured - lastEnergyMeasured;
+
+  *lastEnergyMeasured = measured;
+
+  return diff;
+}
