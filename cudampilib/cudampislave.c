@@ -23,11 +23,13 @@ int __cudampi__myrank;
 
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
+int *__cudampi__freeThreadsPerNode;
 
 MPI_Comm *__cudampi__communicators;
 
-int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
-int __cudampi_localdevicecount = 1;
+int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi__localGpuDeviceCount = 1;
+int __cudampi__localFreeThreadCount = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
@@ -54,7 +56,7 @@ int main(int argc, char **argv) {
 
   // now check the number of GPUs available and synchronize with process 0 that wants this info
 
-  if (cudaSuccess != cudaGetDeviceCount(&__cudampi_localdevicecount)) {
+  if (cudaSuccess != cudaGetDeviceCount(&__cudampi__localGpuDeviceCount)) {
     printf("Error invoking cudaGetDeviceCount()");
     fflush(stdout);
     exit(-1);
@@ -66,22 +68,36 @@ int main(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Allgather(&__cudampi_localdevicecount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
+  __cudampi__freeThreadsPerNode = (int *)malloc(sizeof(int) * __cudampi__MPIproccount);
+  if (!__cudampi__freeThreadsPerNode) {
+    printf("\nNot enough memory");
+    exit(-1); // we could exit in a nicer way! TBD
+  }
 
-  MPI_Bcast(&__cudampi_totalgpudevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
+    printf("Error invoking __cudampi__getCpuFreeThreads()");
+    fflush(stdout);
+    exit(-1);
+  }
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totalgpudevicecount * sizeof(int));
+  MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
+
+  MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
+  
+  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totalgpudevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // create communicators
   // in the case of the slave we need to go by every GPU and for each GPU there will be a separate GPU shared with the master -- process 0
 
-  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_localdevicecount);
+  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
   if (!__cudampi__communicators) {
     printf("\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
@@ -89,7 +105,7 @@ int main(int argc, char **argv) {
 
   int commcounter = 0;
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totalgpudevicecount; i++) {
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) {
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 
@@ -109,15 +125,12 @@ int main(int argc, char **argv) {
   }
 
   // here we need to spawn threads -- each responsible for handling one local GPU
-
-  #pragma omp parallel num_threads(__cudampi_localdevicecount)
+  // spawn one thread for CPU processing if there are free cores, 0 otherwise
+  int numberOfCpuThreads = __cudampi__localFreeThreadCount > 0;
+  #pragma omp parallel num_threads(__cudampi__localGpuDeviceCount + numberOfCpuThreads)
   {
 
     MPI_Status status;
-
-    // set the active GPU
-
-    cudaSetDevice(omp_get_thread_num());
 
     // following communication needs to use dedicated communicators, not MPI_COMM_WORLD!
 

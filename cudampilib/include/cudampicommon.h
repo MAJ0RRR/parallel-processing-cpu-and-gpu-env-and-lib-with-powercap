@@ -11,7 +11,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <cuda_runtime.h>
 
 float computeDevPerformance(struct timeval period);
 
 float getGPUpower(int gpuid);
+
+cudaError_t __cudampi__getCpuFreeThreads(int* count);

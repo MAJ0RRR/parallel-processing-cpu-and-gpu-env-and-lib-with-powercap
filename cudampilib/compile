@@ -10,7 +10,7 @@ VECMAXDIV_DIR="vecmaxdiv"
 
 mkdir -p $BUILD_DIR
 
-gcc -c cudampicommon.c -Iinclude -o $BUILD_DIR/cudampicommon.o
+gcc -c cudampicommon.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampicommon.o
 mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampilib.o 
 nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
 nvcc -c $APPS_DIR/$VECMAXDIV_DIR/appkernelvecmaxdiv.cu -o $BUILD_DIR/appkernelvecmaxdiv.o -Iinclude
