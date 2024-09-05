@@ -590,9 +590,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     }
   }
 
-  if (__cudampi__isCpu()) { // run CPU synchronization remotely
-    // TODO
-  } else if (__cudampi_isLocalGpu) { // run GPU synchronization locally
+  if (__cudampi_isLocalGpu) { // run GPU synchronization locally
 
     // now get power measurement - this should be OK as we assume that computations might be taking place
 
