@@ -35,6 +35,7 @@ int __cudampi__localFreeThreadCount = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
+void launchcpukernel(void *devPtr, int thread_count);
 
 int main(int argc, char **argv) {
 
@@ -50,6 +51,9 @@ int main(int argc, char **argv) {
     fflush(stdout);
     exit(-1);
   }
+  
+  // enable nested omp parallels
+  omp_set_nested(1);
 
   // fetch information about the rank and number of processes
 
@@ -208,12 +212,7 @@ int main(int argc, char **argv) {
         size_t ssize = sizeof(cudaError_t) + sizeof(float);
         unsigned char sdata[ssize];
 
-        // TODO 
-        //int device;
-        ///cudaGetDevice(&device);
-
-        // cudaError_t e = cudaDeviceSynchronize();
-        // *((cudaError_t *)sdata) = e;
+        #pragma omp taskwait
 
         if (measurepower) {
           error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
@@ -222,6 +221,8 @@ int main(int argc, char **argv) {
         if (error != cudaSuccess) {
           *((float *)(sdata + sizeof(cudaError_t))) = -1;
         }
+
+        *((cudaError_t *)sdata) = error;
 
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
@@ -339,14 +340,14 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELREQ) {
+      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
 
         // in this case in the message there is a serialized pointer
 
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
 
-        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         void *devPtr = *((void **)rdata);
 
@@ -356,7 +357,28 @@ int main(int argc, char **argv) {
         unsigned char sdata[ssize];
         *((cudaError_t *)sdata) = cudaSuccess;
 
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCPUKERNELREQ) {
+
+        // in this case in the message there is a serialized pointer
+
+        int rsize = sizeof(void *);
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        void *devPtr = *((void **)rdata);
+
+
+        // #pragma omp taskwait    // maybe this should be included here aswell?
+        #pragma omp task
+        {
+          launchcpukernel(devPtr, __cudampi__localFreeThreadCount);
+        }
+
+        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {

@@ -860,16 +860,16 @@ void __cudampi__kernel(void *devPtr) {
 
     *((void **)sdata) = devPtr;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__currentCommunicator, NULL);
   }
 }
 
-void __cudampi__cpuKernel(void *devPtr)
+void __cudampi__cpuKernel(void *devPtr){
   // launch remotely
   // TODO
 }
