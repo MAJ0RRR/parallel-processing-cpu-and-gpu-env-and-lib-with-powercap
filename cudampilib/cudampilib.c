@@ -50,7 +50,7 @@ struct timeval __cudampi__time[__CUDAMPI_MAX_THREAD_COUNT];      // last time me
 int __cudampi__timemeasured[__CUDAMPI_MAX_THREAD_COUNT] = {0};   // whether time measurement started
 float __cudampi__devicepower[__CUDAMPI_MAX_THREAD_COUNT];        // current power taken by a device
 
-float __cudampi__inverseDeviceEnergyUsed[__CUDAMPI_MAX_THREAD_COUNT = {0}]; // energy used by the device between measurements
+float __cudampi__inverseDeviceEnergyUsed[__CUDAMPI_MAX_THREAD_COUNT] = {0}; // energy used by the device between measurements
 
 int __cudampi__deviceenabled[__CUDAMPI_MAX_THREAD_COUNT]; // whether the given device is enabled for further use
 
@@ -669,7 +669,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     if (!__cudampi__isCpu()){
       // time and power are already measured, so it's possible to compute energy used by the device
-      __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = computeDevPerformance(__cudampi__time[__cudampi__currentDevice]) / __cudampi__devicepower[__cudampi__currentDevice]
+      __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = computeDevPerformance(__cudampi__time[__cudampi__currentDevice]) / __cudampi__devicepower[__cudampi__currentDevice];
     }
   } else {
     __cudampi__timemeasured[__cudampi__currentDevice] = 1;

@@ -12,16 +12,16 @@ mkdir -p $BUILD_DIR
 
 gcc -c cudampicommon.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampicommon.o
 mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampilib.o 
-nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
-nvcc -c $APPS_DIR/$VECMAXDIV_DIR/appkernelvecmaxdiv.cu -o $BUILD_DIR/appkernelvecmaxdiv.o -Iinclude
-nvcc -c $APPS_DIR/$VECADD_DIR/appkernelvecadd.cu -o $BUILD_DIR/appkernelvecadd.o -Iinclude
+#nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
+#nvcc -c $APPS_DIR/$VECMAXDIV_DIR/appkernelvecmaxdiv.cu -o $BUILD_DIR/appkernelvecmaxdiv.o -Iinclude
+#nvcc -c $APPS_DIR/$VECADD_DIR/appkernelvecadd.cu -o $BUILD_DIR/appkernelvecadd.o -Iinclude
 nvcc -c $APPS_DIR/$COLLATZ_DIR/appkernelcollatz.cu -o $BUILD_DIR/appkernelcollatz.o
-nvcc -c $APPS_DIR/$PATTERSEARCH_DIR/appkernelpatternsearch.cu -o $BUILD_DIR/appkernelpatternsearch.o -Iinclude
+#nvcc -c $APPS_DIR/$PATTERSEARCH_DIR/appkernelpatternsearch.cu -o $BUILD_DIR/appkernelpatternsearch.o -Iinclude
 
 
-gcc -c $APPS_DIR/$COLLATZ_DIR/cpukernelcolaltz.c -Iinclude -o $BUILD_DIR/cpukernelcollatz.o
+gcc -c $APPS_DIR/$COLLATZ_DIR/cpukernelcollatz.c -Iinclude -o $BUILD_DIR/cpukernelcollatz.o
 
-mpicc -fopenmp -o $BUILD_DIR/cudampislave cudampislave.c $BUILD_DIR/appkernel.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
+#mpicc -fopenmp -o $BUILD_DIR/cudampislave cudampislave.c $BUILD_DIR/appkernel.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 #mpicc -fopenmp -o $BUILD_DIR/cudampislave-vecmaxdiv cudampislave.c $BUILD_DIR/appkernelvecmaxdiv.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 #mpicc -fopenmp -o $BUILD_DIR/cudampislave-vecadd cudampislave.c $BUILD_DIR/appkernelvecadd.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 mpicc -fopenmp -o $BUILD_DIR/cudampislave-collatz cudampislave.c $BUILD_DIR/cpukernelcollatz.o $BUILD_DIR/appkernelcollatz.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++ -lm
