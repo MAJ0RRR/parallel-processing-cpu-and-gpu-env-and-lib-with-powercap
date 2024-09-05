@@ -592,7 +592,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
   }
 
   if (__cudampi__isCpu()) { // run CPU synchronization remotely
-    // wyjebać local cpu
     // TODO
   } else if (__cudampi_isLocalGpu) { // run GPU synchronization locally
 
@@ -795,6 +794,7 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 }
 
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+  // TODO
   return cudaSuccess;
 }
 
@@ -846,15 +846,9 @@ void __cudampi__kernel(void *devPtr) {
   }
 }
 
-void cpukernel(void *devPtr, int num_threads);
-
-void __cudampi__cpuKernel(void *devPtr){
-
-  if (__cudampi__isLocalCpu) { // run locally
-    cpukernel(devPtr, __cudampi__freeThreadsPerNode[0]);
-  } else { // launch remotely
-    // TODO
-  }
+void __cudampi__cpuKernel(void *devPtr)
+  // launch remotely
+  // TODO
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
