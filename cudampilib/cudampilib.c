@@ -25,6 +25,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
 
+
 int *__cudampi__GPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
 int __cudampi_totaldevicecount = 0; // how many GPUs + CPUs (on all considered nodes)
