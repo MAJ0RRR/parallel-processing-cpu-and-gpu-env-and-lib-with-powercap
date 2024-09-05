@@ -17,4 +17,4 @@ float computeDevPerformance(struct timeval period);
 
 float getGPUpower(int gpuid);
 
-cudaError_t __cudampi__getCpuFreeThreads(int* count)
+cudaError_t __cudampi__getCpuFreeThreads(int* count);
