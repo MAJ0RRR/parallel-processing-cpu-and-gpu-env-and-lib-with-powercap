@@ -335,13 +335,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  // each process first checks its own device count
-  if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
-    printf("Error invoking __cudampi__getCpuFreeThreads()");
-    fflush(stdout);
-    exit(-1);
-  }
-  // TODO: fill this variable
+  // Master does not use local free threads for computations
+  __cudampi__localFreeThreadCount = 0;
 
   MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -845,7 +840,7 @@ void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream) {
   }
 }
 
-void launchkernel(void *devPtr);
+void launchkernel(void *devPtr);  // extern from .cu
 
 void __cudampi__kernel(void *devPtr) {
 
@@ -870,8 +865,17 @@ void __cudampi__kernel(void *devPtr) {
 }
 
 void __cudampi__cpuKernel(void *devPtr){
-  // launch remotely
-  // TODO
+  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+
+  // launch remotely - since master does not use local threads for computations
+  size_t ssize = sizeof(void *);
+  unsigned char sdata[ssize];
+
+  *((void **)sdata) = devPtr;
+
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__currentCommunicator);
+
+  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__currentCommunicator, NULL);
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
