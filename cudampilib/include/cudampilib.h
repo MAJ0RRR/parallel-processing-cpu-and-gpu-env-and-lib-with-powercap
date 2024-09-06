@@ -42,6 +42,10 @@ cudaError_t __cudampi__malloc(void **devPtr, size_t size);
 
 cudaError_t __cudampi__cudaFree(void *devPtr);
 
+cudaError_t __cudampi__cpuFree(void *devPtr);
+
+cudaError_t __cudampi__free(void *devPtr);
+
 cudaError_t __cudampi__deviceSynchronize(void);
 
 cudaError_t __cudampi__cudaSetDevice(int device);
