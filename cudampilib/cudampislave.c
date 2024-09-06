@@ -212,6 +212,7 @@ int main(int argc, char **argv) {
         size_t ssize = sizeof(cudaError_t) + sizeof(float);
         unsigned char sdata[ssize];
 
+        // Synchronize all threads
         #pragma omp taskwait
 
         if (measurepower) {
