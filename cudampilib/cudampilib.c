@@ -24,9 +24,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
+#define  __cudampi_isLocalCpu __cudampi__currentDevice < __cudampi__CPUcountspernode[0]
 
 
 int *__cudampi__GPUcountspernode;
+int *__cudampi__CPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
 int __cudampi_totaldevicecount = 0; // how many GPUs + CPUs (on all considered nodes)
 int __cudampi_totalgpudevicecount = 0; // how many GPUs in total (on all considered nodes)
@@ -515,9 +517,32 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
     return ((cudaError_t)(rdata + sizeof(void *)));
   }
 }
+
 cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
-  // TODO
-  return cudaSuccess;
+  if (__cudampi_isLocalCpu) { // run locally
+        return malloc(size);
+  } else { // allocate remotely
+
+    // we then return the actual pointer from another node -- it is used only on that node
+
+    // request allocation on the other node
+
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+
+    unsigned long sdata = size; // how many bytes to allocate on the CPU
+
+    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
+
+    int rsize = sizeof(void *) + sizeof(cudaError_t);
+    // receive confirmation with the actual pointer
+    unsigned char rdata[rsize];
+
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
+
+    *devPtr = *((void **)rdata);
+
+    return ((cudaError_t)(rdata + sizeof(void *)));
+  }
 }
 
 cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
@@ -552,6 +577,37 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
 
     return ((cudaError_t)rdata);
   }
+}
+
+cudaError_t __cudampi__cpuFree(void **devPtr, size_t size) {
+  if (__cudampi_isLocalCpu) { // run locally
+      free(devPtr);
+  } else { // allocate remotely
+ 
+      int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+
+      // data for sending (devPtr pointer address)
+      int ssize = sizeof(void *);
+      unsigned char sdata[ssize];
+
+      *((void **)sdata) = devPtr;
+
+      MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
+
+      int rsize = sizeof(cudaError_t);
+      unsigned char rdata[rsize];
+
+      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
+
+      return *((cudaError_t *)rdata);
+}
+
+cudaError_t __cudampi__free(void **devPtr, size_t size) {
+  if (__cudampi__isCpu()) {
+    return __cudampi__cpuFree(devPtr, size);
+  }
+  // else
+  return __cudampi__cudaFree(devPtr, size);
 }
 
 cudaError_t __cudampi__cudaDeviceSynchronize(void)
