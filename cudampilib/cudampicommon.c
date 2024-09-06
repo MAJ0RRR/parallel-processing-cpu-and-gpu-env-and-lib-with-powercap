@@ -41,7 +41,7 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   return 0;
 }
 
-float getCpuEnergyUsed(float* lastEnergyMeasured) {
+ cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
   // compute energy used from last energy measurement and update the variable
 
   FILE *file;
@@ -51,22 +51,22 @@ float getCpuEnergyUsed(float* lastEnergyMeasured) {
   file = fopen("/sys/class/powercap/intel-rapl:0/energy_uj", "r");
   if (file == NULL) {
       perror("Failed to open energy_uj file");
-      return 1;
+      return cudaErrorUnknown ;
   }
 
   if (fscanf(file, "%llu", &energy_uj) != 1) {
       perror("Failed to read energy value");
       fclose(file);
-      return 1;
+      return cudaErrorUnknown ;
   }
 
   fclose(file);
 
   energy_joules = (float)energy_uj / 1e6;
 
-  float diff = energy_joules - lastEnergyMeasured;
+  *energyUsed = energy_joules - lastEnergyMeasured;
 
   *lastEnergyMeasured = energy_joules;
 
-  return diff;
+  return cudaSuccess;
 }

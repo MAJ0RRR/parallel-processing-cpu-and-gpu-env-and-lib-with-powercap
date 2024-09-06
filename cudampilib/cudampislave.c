@@ -199,6 +199,7 @@ int main(int argc, char **argv) {
       if (status.MPI_TAG == __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ) {
 
         int measurepower;
+        cudaError_t error = cudaErrorUnknown;
 
         MPI_Recv(&measurepower, 1, MPI_INT, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
@@ -214,7 +215,13 @@ int main(int argc, char **argv) {
         // cudaError_t e = cudaDeviceSynchronize();
         // *((cudaError_t *)sdata) = e;
 
-        *((float *)(sdata + sizeof(cudaError_t))) = (measurepower ? getCpuEnergyUsed(&lastEnergyMeasured) : -1); // -1 if not measured
+        if (measurepower) {
+          error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
+        }
+
+        if (error != cudaSuccess) {
+          *((float *)(sdata + sizeof(cudaError_t))) = -1;
+        }
 
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
