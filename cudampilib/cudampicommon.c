@@ -38,7 +38,8 @@ float getGPUpower(int gpuid) {
 cudaError_t __cudampi__getCpuFreeThreads(int* count)
 {
   // TODO
-  return 0;
+  *count = 0;
+  return cudaSuccess;
 }
 
  cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
@@ -64,7 +65,7 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
 
   energy_joules = (float)energy_uj / 1e6;
 
-  *energyUsed = energy_joules - lastEnergyMeasured;
+  *energyUsed = energy_joules - *lastEnergyMeasured;
 
   *lastEnergyMeasured = energy_joules;
 

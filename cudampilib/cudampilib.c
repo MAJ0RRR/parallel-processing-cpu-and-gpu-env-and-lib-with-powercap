@@ -277,7 +277,8 @@ int __cudampi__isdeviceenabled(int deviceid) {
 }
 
 cudaError_t __cudampi__getDeviceCount(int *count) {
-  return __cudampi_totaldevicecount;
+  *count =  __cudampi_totaldevicecount;
+  return cudaSuccess;
 }
 
 cudaError_t __cudampi__cudaGetDeviceCount(int *count) {
