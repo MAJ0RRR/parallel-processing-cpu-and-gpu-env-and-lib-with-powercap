@@ -376,7 +376,8 @@ int main(int argc, char **argv) {
         // TODO: Investigate if taskwait / lock mechanism should be implemented here
         #pragma omp task
         {
-          launchcpukernel(devPtr, __cudampi__localFreeThreadCount);
+          // Launch with all free CPU threads - 1 for thread that manages CPU computation
+          launchcpukernel(devPtr, __cudampi__localFreeThreadCount - 1);
         }
 
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);

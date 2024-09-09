@@ -37,9 +37,10 @@ float getGPUpower(int gpuid) {
 
 cudaError_t __cudampi__getCpuFreeThreads(int* count)
 {
-  // TODO
-  *count = 0;
-  return cudaSuccess;
+  int gpuCount = 0;
+  cudaError_t status = cudaGetDeviceCount(&gpuCount);
+  *count = omp_get_max_threads() - gpuCount;
+  return status;
 }
 
  cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
