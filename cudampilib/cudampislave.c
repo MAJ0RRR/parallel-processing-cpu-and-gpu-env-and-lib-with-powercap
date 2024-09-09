@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
         void *devPtr = *((void **)rdata);
 
 
-        // #pragma omp taskwait    // maybe this should be included here aswell?
+        // TODO: Investigate if taskwait / lock mechanism should be implemented here
         #pragma omp task
         {
           launchcpukernel(devPtr, __cudampi__localFreeThreadCount);
