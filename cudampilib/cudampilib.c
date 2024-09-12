@@ -757,9 +757,25 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
   }
 }
 
-cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
-  // TODO
-  return cudaSuccess;
+// TODO: Czy zwracać wskaźnik? Czy adres pamięci jako liczbę, skoro pamięć będzie na zdalnym komputerze
+void* __cudampi__cpuMemcpy(void *dst, const void *src, size_t count) {
+    if (__cudampi_isLocalGpu) { // run locally
+        return memcpy(dst, src, count);
+    }
+
+    size_t ssize = count;
+    unsigned char sdata[ssize];
+
+    *((void **)sdata) = dst;
+    memcpy(sdata, src, count); // copy input data
+
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUMPIMEMCPYREQ, __cudampi__currentCommunicator);
+
+    void* rdata;
+
+    MPI_Recv(rdata, sizeof(void*), MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUMPIMEMCPYRESP, __cudampi__currentCommunicator, NULL);
+
+    return rdata;
 }
 
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {

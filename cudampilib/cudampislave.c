@@ -239,6 +239,30 @@ int main(int argc, char **argv) {
         MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPISETDEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
+      if (status.MPI_TAG == __cudampi__CPUMPIMEMCPYREQ) {
+
+          // in this case in the message there is a serialized pointer and data so we need to find out the size first
+
+          int rsize;
+          MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rsize);
+
+          unsigned char rdata[rsize];
+          MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIHOSTTODEVICEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+          void *devPtr = *((void **)rdata);
+
+          void *remotePointer;
+          remotePointer = malloc(rsize)
+
+          memcpy(remotePointer, devPtr, rsize)
+
+          // now send the data to the GPU
+          cudaError_t e = cudaMemcpy(devPtr, rdata + sizeof(void *), rsize - sizeof(void *), cudaMemcpyHostToDevice);
+
+          // TODO: Czy dobry typ void* jako pierwszy argument
+          MPI_Send((void *)(remotePointer), rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
       if (status.MPI_TAG == __cudampi__CUDAMPIHOSTTODEVICEREQ) {
 
         // in this case in the message there is a serialized pointer and data so we need to find out the size first
