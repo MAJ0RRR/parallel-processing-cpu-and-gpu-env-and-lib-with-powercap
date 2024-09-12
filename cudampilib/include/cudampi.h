@@ -39,9 +39,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP 28
 #define __cudampi__CUDAMPILAUNCHCPUKERNELREQ 29
 #define __cudampi__CUDAMPILAUNCHCPUKERNELRESP 30
-#define __cpumpi__CPUMALLOCREQ 27
-#define __cpumpi__CPUMALLOCRESP 28
-#define __cpumpi__CPUFREEREQ 27
-#define __cpumpi__CPUFREERESP 28
-
+#define __cpumpi__CPUMALLOCREQ 31
+#define __cpumpi__CPUMALLOCRESP 32
+#define __cpumpi__CPUFREEREQ 33
+#define __cpumpi__CPUFREERESP 33
 #define __cudampi__CUDAMPIFINALIZE 100
