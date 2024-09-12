@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
         MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cpumpi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         // allocate memory on the current GPU
-        void *devPtr = = malloc((size_t)rdata);
+        void *devPtr = malloc((size_t)rdata);
 
         int ssize = sizeof(void *) + sizeof(cudaError_t);
         // send confirmation with the actual pointer
