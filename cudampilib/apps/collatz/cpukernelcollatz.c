@@ -48,7 +48,7 @@ void appkernel(void *devPtr, int num_elements, int num_threads) {
   }
 }
 
-void cpukernel(void *devPtr, int num_threads) {
+extern void launchcpukernel(void *devPtr, int num_threads) {
 
   // dim3 blocksingrid(100); // 20
   // dim3 threadsinblock(500);

@@ -37,6 +37,38 @@ float getGPUpower(int gpuid) {
 
 cudaError_t __cudampi__getCpuFreeThreads(int* count)
 {
-  // TODO
-  return 0;
+  int gpuCount = 0;
+  cudaError_t status = cudaGetDeviceCount(&gpuCount);
+  *count = omp_get_max_threads() - gpuCount;
+  return status;
+}
+
+ cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
+  // compute energy used from last energy measurement and update the variable
+
+  FILE *file;
+  unsigned long long energy_uj;
+  float energy_joules;
+
+  file = fopen("/sys/class/powercap/intel-rapl:0/energy_uj", "r");
+  if (file == NULL) {
+      perror("Failed to open energy_uj file");
+      return cudaErrorUnknown ;
+  }
+
+  if (fscanf(file, "%llu", &energy_uj) != 1) {
+      perror("Failed to read energy value");
+      fclose(file);
+      return cudaErrorUnknown ;
+  }
+
+  fclose(file);
+
+  energy_joules = (float)energy_uj / 1e6;
+
+  *energyUsed = energy_joules - *lastEnergyMeasured;
+
+  *lastEnergyMeasured = energy_joules;
+
+  return cudaSuccess;
 }

@@ -21,6 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
 
+float lastEnergyMeasured = 0.0;
+
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
@@ -33,6 +35,7 @@ int __cudampi__localFreeThreadCount = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
+void launchcpukernel(void *devPtr, int thread_count);
 
 int main(int argc, char **argv) {
 
@@ -48,6 +51,9 @@ int main(int argc, char **argv) {
     fflush(stdout);
     exit(-1);
   }
+  
+  // enable nested omp parallels
+  omp_set_nested(1);
 
   // fetch information about the rank and number of processes
 
@@ -194,6 +200,34 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
+      if (status.MPI_TAG == __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ) {
+
+        int measurepower;
+        cudaError_t error = cudaErrorUnknown;
+
+        MPI_Recv(&measurepower, 1, MPI_INT, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        // perform power measurement and attach it to the response
+
+        size_t ssize = sizeof(cudaError_t) + sizeof(float);
+        unsigned char sdata[ssize];
+
+        // Synchronize all threads
+        #pragma omp taskwait
+
+        if (measurepower) {
+          error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
+        }
+
+        if (error != cudaSuccess) {
+          *((float *)(sdata + sizeof(cudaError_t))) = -1;
+        }
+
+        *((cudaError_t *)sdata) = error;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
       if (status.MPI_TAG == __cudampi__CUDAMPISETDEVICEREQ) {
 
         int device;
@@ -307,14 +341,14 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELREQ) {
+      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
 
         // in this case in the message there is a serialized pointer
 
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
 
-        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         void *devPtr = *((void **)rdata);
 
@@ -324,7 +358,29 @@ int main(int argc, char **argv) {
         unsigned char sdata[ssize];
         *((cudaError_t *)sdata) = cudaSuccess;
 
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCPUKERNELREQ) {
+
+        // in this case in the message there is a serialized pointer
+
+        int rsize = sizeof(void *);
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        void *devPtr = *((void **)rdata);
+
+
+        // TODO: Investigate if taskwait / lock mechanism should be implemented here
+        #pragma omp task
+        {
+          // Launch with all free CPU threads - 1 for thread that manages CPU computation
+          launchcpukernel(devPtr, __cudampi__localFreeThreadCount - 1);
+        }
+
+        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
