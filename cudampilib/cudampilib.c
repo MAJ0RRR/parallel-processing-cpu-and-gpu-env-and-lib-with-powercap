@@ -24,7 +24,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
-#define  __cudampi_isLocalCpu __cudampi__currentDevice < __cudampi__CPUcountspernode[0]
 
 
 int *__cudampi__GPUcountspernode;
@@ -519,30 +518,27 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 }
 
 cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
-  if (__cudampi_isLocalCpu) { // run locally
-        return malloc(size);
-  } else { // allocate remotely
+  // allocate remotely
 
-    // we then return the actual pointer from another node -- it is used only on that node
+  // we then return the actual pointer from another node -- it is used only on that node
 
-    // request allocation on the other node
+  // request allocation on the other node
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-    unsigned long sdata = size; // how many bytes to allocate on the CPU
+  unsigned long sdata = size; // how many bytes to allocate on the CPU
 
-    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
 
-    int rsize = sizeof(void *) + sizeof(cudaError_t);
-    // receive confirmation with the actual pointer
-    unsigned char rdata[rsize];
+  int rsize = sizeof(void *) + sizeof(cudaError_t);
+  // receive confirmation with the actual pointer
+  unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
 
-    *devPtr = *((void **)rdata);
+  *devPtr = *((void **)rdata);
 
-    return ((cudaError_t)(rdata + sizeof(void *)));
-  }
+  return ((cudaError_t)(rdata + sizeof(void *)));
 }
 
 cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
@@ -579,27 +575,24 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   }
 }
 
-cudaError_t __cudampi__cpuFree(void **devPtr, size_t size) {
-  if (__cudampi_isLocalCpu) { // run locally
-      free(devPtr);
-  } else { // allocate remotely
- 
-      int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+cudaError_t __cudampi__cpuFree(void **devPtr) {
+  // allocate remotely
+  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-      // data for sending (devPtr pointer address)
-      int ssize = sizeof(void *);
-      unsigned char sdata[ssize];
+  // data for sending (devPtr pointer address)
+  int ssize = sizeof(void *);
+  unsigned char sdata[ssize];
 
-      *((void **)sdata) = devPtr;
+  *((void **)sdata) = devPtr;
 
-      MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
 
-      int rsize = sizeof(cudaError_t);
-      unsigned char rdata[rsize];
+  int rsize = sizeof(cudaError_t);
+  unsigned char rdata[rsize];
 
-      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
 
-      return *((cudaError_t *)rdata);
+  return *((cudaError_t *)rdata);
 }
 
 cudaError_t __cudampi__free(void **devPtr, size_t size) {
