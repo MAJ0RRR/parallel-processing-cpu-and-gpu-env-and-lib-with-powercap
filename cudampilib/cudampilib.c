@@ -410,12 +410,13 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     __cudampi_targetGPUfordevice[i] = -1;
     __cudampi__devicepower[i] = -1; // initial value
     __cudampi__deviceenabled[i] = 1;
-    while (__cudampi__freeThreadsPerNode[i] <= 0)
+    while (__cudampi__freeThreadsPerNode[currentrank] <= 0)
     {
       // skip all nodes with no free threads;
       currentrank ++;
     }
     __cudampi_targetMPIrankfordevice[i] = currentrank;
+    currentrank ++;
   }
   // initialize current device id to 0 although various threads are expected to have various GPU ids
 
@@ -648,7 +649,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-    int sdata = 1; // if 0 then means do not measure power, if 1 do measure on the slave side
+    int sdata = 0; // if 0 then means do not measure power, if 1 do measure on the slave side
     float energy = -1, power = -1;
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
