@@ -575,7 +575,7 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   }
 }
 
-cudaError_t __cudampi__cpuFree(void **devPtr) {
+cudaError_t __cudampi__cpuFree(void *devPtr) {
   // allocate remotely
   int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
@@ -595,12 +595,12 @@ cudaError_t __cudampi__cpuFree(void **devPtr) {
   return *((cudaError_t *)rdata);
 }
 
-cudaError_t __cudampi__free(void **devPtr, size_t size) {
+cudaError_t __cudampi__free(void *devPtr) {
   if (__cudampi__isCpu()) {
-    return __cudampi__cpuFree(devPtr, size);
+    return __cudampi__cpuFree(devPtr);
   }
   // else
-  return __cudampi__cudaFree(devPtr, size);
+  return __cudampi__cudaFree(devPtr);
 }
 
 cudaError_t __cudampi__cudaDeviceSynchronize(void)
