@@ -356,7 +356,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     fclose(filep);
   }
 
-// TODO also consider cpu devices
   // compute the total device count
   __cudampi_totalgpudevicecount = 0;
   for (i = 0; i < __cudampi__MPIproccount; i++) {
@@ -381,8 +380,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-
-// TODO also consider cpu devices
   __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     printf("\nNot enough memory");
@@ -393,8 +390,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   int currentGPU = 0;
   // now initialize values device by device
   for (i = 0; i < __cudampi_totalgpudevicecount; i++) {
-
-  // TODO also consider cpu devices
     __cudampi_targetGPUfordevice[i] = currentGPU;
     __cudampi_targetMPIrankfordevice[i] = currentrank;
 
@@ -412,8 +407,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   currentrank = 0;
   for (i = __cudampi_totalgpudevicecount; i < __cudampi_totaldevicecount; i++) {
-
-    // TODO also consider cpu devices
     __cudampi_targetGPUfordevice[i] = -1;
     __cudampi__devicepower[i] = -1; // initial value
     __cudampi__deviceenabled[i] = 1;
@@ -747,7 +740,7 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
 
 int __cudampi__isCpu()
 {
-  // TODO
+  // TODO ?
   return __cudampi__currentDevice  >= __cudampi_totalgpudevicecount;
 }
 
