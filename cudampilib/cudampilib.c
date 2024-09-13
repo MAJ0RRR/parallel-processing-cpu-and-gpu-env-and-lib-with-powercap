@@ -469,7 +469,7 @@ void __cudampi__terminateMPI() {
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
   for (int i = __cudampi__localGpuDeviceCount; i < __cudampi_totaldevicecount; i++) {
-    MPI_Send(NULL, 0, MPI_CHAR, 1 /*__cudampi__gettargetMPIrank(i)*/, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
+    MPI_Send(NULL, 0, MPI_CHAR, 1, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
   }
 
   MPI_Finalize();
@@ -499,17 +499,15 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 
     // request allocation on the other node
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     unsigned long sdata = size; // how many bytes to allocate on the GPU
 
-    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1, __cudampi__CUDAMPIMALLOCREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(void *) + sizeof(cudaError_t);
     // receive confirmation with the actual pointer
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIMALLOCRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIMALLOCRESP, __cudampi__currentCommunicator, NULL);
 
     *devPtr = *((void **)rdata);
 
@@ -524,17 +522,15 @@ cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
 
   // request allocation on the other node
 
-  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
   unsigned long sdata = size; // how many bytes to allocate on the CPU
 
-  MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
 
   int rsize = sizeof(void *) + sizeof(cudaError_t);
   // receive confirmation with the actual pointer
   unsigned char rdata[rsize];
 
-  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
 
   *devPtr = *((void **)rdata);
 
@@ -556,20 +552,17 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   if (__cudampi_isLocalGpu) { // run locally
     return cudaFree(devPtr);
   } else { // allocate remotely
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     int ssize = sizeof(void *);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREEREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIFREEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIFREERESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIFREERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
@@ -577,20 +570,18 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
 
 cudaError_t __cudampi__cpuFree(void *devPtr) {
   // allocate remotely
-  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
   // data for sending (devPtr pointer address)
   int ssize = sizeof(void *);
   unsigned char sdata[ssize];
 
   *((void **)sdata) = devPtr;
 
-  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
 
   int rsize = sizeof(cudaError_t);
   unsigned char rdata[rsize];
 
-  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, targetrank, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
 
   return *((cudaError_t *)rdata);
 }
@@ -652,9 +643,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     retVal = cudaDeviceSynchronize();
   } else { // run synchronization remotely
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     int sdata = 1; // if 0 then means do not measure power, if 1 do measure on the slave side
     float energy = -1, power = -1;
     int rsize = sizeof(cudaError_t) + sizeof(float);
@@ -663,12 +651,12 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     if (__cudampi__isCpu())
     {
-      MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
+      MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
       // receive an error message and a float representing power consumption
 
 
-      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
+      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
 
       // decode and store power consumption for the device
 
@@ -677,11 +665,11 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     }
     else
     {
-      MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
+      MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
       // receive an error message and a float representing power consumption
 
-      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
+      MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
 
       // decode and store power consumption for the device
 
@@ -729,17 +717,14 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
   if (__cudampi_isLocalGpu) { // run locally
     return cudaSetDevice(device);
   } else { // set device remotely
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     int sdata = __cudampi__gettargetGPU(__cudampi__currentDevice); // compute the target GPU id
 
-    MPI_Send(&sdata, 1, MPI_INT, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICEREQ, __cudampi__currentCommunicator);
+    MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPISETDEVICEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISETDEVICERESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPISETDEVICERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
@@ -766,26 +751,22 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
     return cudaMemcpy(dst, src, count, kind);
   } else if (kind == cudaMemcpyHostToDevice) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     size_t ssize = sizeof(void *) + count;
     unsigned char sdata[ssize];
 
     *((void **)sdata) = dst;
     memcpy(sdata + sizeof(void *), src, count); // copy input data
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long);
     unsigned char sdata[ssize];
@@ -793,12 +774,12 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
@@ -809,26 +790,22 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
 cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   // run remotely
   if (kind == cudaMemcpyHostToDevice) {
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     size_t ssize = sizeof(void *) + count;
     unsigned char sdata[ssize];
 
     *((void **)sdata) = dst;
     memcpy(sdata + sizeof(void *), src, count); // copy input data
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUHOSTTODEVICEREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICEREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long);
     unsigned char sdata[ssize];
@@ -836,12 +813,12 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
@@ -855,8 +832,6 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     return cudaMemcpyAsync(dst, src, count, kind, stream);
   } else if (kind == cudaMemcpyHostToDevice) {
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     size_t ssize = sizeof(void *) + sizeof(cudaStream_t) + count;
     unsigned char sdata[ssize];
 
@@ -864,18 +839,16 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
     memcpy(sdata + sizeof(void *) + sizeof(cudaStream_t), src, count); // copy input data
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
-
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t);
     unsigned char sdata[ssize];
@@ -884,12 +857,12 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
     *((cudaStream_t *)(sdata + sizeof(void *) + sizeof(unsigned long))) = stream;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
@@ -910,19 +883,17 @@ void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream) {
     launchkernelinstream(devPtr, stream);
   } else { // launch remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     size_t ssize = sizeof(void *) + sizeof(cudaStream_t);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__currentCommunicator, NULL);
   }
 }
 
@@ -934,24 +905,22 @@ void __cudampi__kernel(void *devPtr) {
     launchkernel(devPtr);
   } else { // launch remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     size_t ssize = sizeof(void *);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
 
-    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__currentCommunicator);
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__currentCommunicator, NULL);
   }
 }
 
 void __cudampi__cpuKernel(void *devPtr){
-  int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+  
 
   // launch remotely - since master does not use local threads for computations
   size_t ssize = sizeof(void *);
@@ -959,9 +928,9 @@ void __cudampi__cpuKernel(void *devPtr){
 
   *((void **)sdata) = devPtr;
 
-  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__currentCommunicator);
 
-  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__currentCommunicator, NULL);
+  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__currentCommunicator, NULL);
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
@@ -972,17 +941,15 @@ cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
 
     // we then return the actual pointer from another node -- it is used only on that node
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     // send an empty message -- there is no need for input data
-    MPI_Send(NULL, 0, MPI_UNSIGNED_LONG, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATEREQ, __cudampi__currentCommunicator);
+    MPI_Send(NULL, 0, MPI_UNSIGNED_LONG, 1, __cudampi__CUDAMPISTREAMCREATEREQ, __cudampi__currentCommunicator);
 
     // get a pointer to the newly created stream + an error message
     int rsize = sizeof(cudaStream_t) + sizeof(cudaError_t);
     // receive confirmation with the actual pointer
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMCREATERESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPISTREAMCREATERESP, __cudampi__currentCommunicator, NULL);
 
     *pStream = *((cudaStream_t *)rdata);
 
@@ -996,19 +963,17 @@ cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream) {
     return cudaStreamDestroy(stream);
   } else { // destroy remotely
 
-    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
-
     int ssize = sizeof(cudaStream_t);
     unsigned char sdata[ssize];
 
     *((cudaStream_t *)sdata) = stream;
 
-    MPI_Send((unsigned char *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYREQ, __cudampi__currentCommunicator);
+    MPI_Send((unsigned char *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPISTREAMDESTROYREQ, __cudampi__currentCommunicator);
 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CUDAMPISTREAMDESTROYRESP, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPISTREAMDESTROYRESP, __cudampi__currentCommunicator, NULL);
 
     return ((cudaError_t)rdata);
   }
