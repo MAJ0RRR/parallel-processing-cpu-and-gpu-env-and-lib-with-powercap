@@ -164,6 +164,28 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
+      if (status.MPI_TAG == __cpumpi__CPUMALLOCREQ) {
+
+        unsigned long rdata;
+
+        MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cpumpi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        // allocate memory on the current GPU
+        void *devPtr = malloc((size_t)rdata);
+
+        int ssize = sizeof(void *) + sizeof(cudaError_t);
+        // send confirmation with the actual pointer
+        unsigned char sdata[ssize];
+
+        *((void **)sdata) = devPtr;
+
+        // return cudaSuccess if memory is not NULL, cudaErrorMemoryAllocation otherwise
+        cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
+        *((cudaError_t *)(sdata + sizeof(void *))) = e;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
 
         int rsize = sizeof(void *);
@@ -176,6 +198,25 @@ int main(int argc, char **argv) {
         cudaError_t e = cudaFree(devPtr);
 
         MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIFREERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cpumpi__CPUFREEREQ) {
+
+        int rsize = sizeof(void *);
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        void *devPtr = *((void **)rdata);
+        cudaError_t e = cudaErrorInvalidDevicePointer;
+
+        // maybe we should somehow handle invalid devPtr ?
+        if (devPtr != NULL) {
+          free(devPtr);
+          e = cudaSuccess;
+        }
+
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
