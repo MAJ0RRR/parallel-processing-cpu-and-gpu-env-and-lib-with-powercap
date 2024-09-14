@@ -13,34 +13,25 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
 
-#define ENABLE_LOGGING
-#include "logger.h"
-
-__global__ void appkernel(void *devPtr) 
+void appkernel(void *devPtr, int num_elements, int num_threads) 
 {
-  double *devPtra = (double *)(((void **)devPtr)[0]);
-  double *devPtrb = (double *)(((void **)devPtr)[1]);
-  double *devPtrc = (double *)(((void **)devPtr)[2]);
+    double *devPtra = (double *)(((void **)devPtr)[0]);
+    double *devPtrb = (double *)(((void **)devPtr)[1]);
+    double *devPtrc = (double *)(((void **)devPtr)[2]);
 
-  long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-
-  devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+    #pragma omp parallel for num_threads(num_threads)
+    {
+        for (long my_index = 0; my_index < num_elements; my_index++) 
+        {
+            devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+        }
+    }
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
+extern void launchcpukernel(void *devPtr, int num_threads)
 {
-  dim3 blocksingrid(100);
-  dim3 threadsinblock(1000);
-
-  appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
-
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
-  }
+    int num_elements = 100 * 1000;
+    appkernel(devPtr, num_elements, num_threads);
 }
-
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }
