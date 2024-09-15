@@ -807,8 +807,46 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
 }
 
 cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
-  // TODO
-  return cudaSuccess;
+  // run remotely
+  if (kind == cudaMemcpyHostToDevice) {
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+
+    size_t ssize = sizeof(void *) + count;
+    unsigned char sdata[ssize];
+
+    *((void **)sdata) = dst;
+    memcpy(sdata + sizeof(void *), src, count); // copy input data
+
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUHOSTTODEVICEREQ, __cudampi__currentCommunicator);
+
+    int rsize = sizeof(cudaError_t);
+    unsigned char rdata[rsize];
+
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
+
+    return ((cudaError_t)rdata);
+
+  } else if (kind == cudaMemcpyDeviceToHost) {
+
+    int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
+
+    size_t ssize = sizeof(void *) + sizeof(unsigned long);
+    unsigned char sdata[ssize];
+
+    *((void **)sdata) = (void *)src;
+    *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
+
+    MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__currentCommunicator);
+
+    size_t rsize = sizeof(cudaError_t) + count;
+    unsigned char rdata[rsize];
+
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1 /*targetrank*/, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
+
+    memcpy(dst, rdata + sizeof(cudaError_t), count);
+
+    return ((cudaError_t)rdata);
+  }
 }
 
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
@@ -861,7 +899,7 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   // TODO
-  return cudaSuccess;
+  return __cudampi__cpuMemcpy(dst, src, count, kind);
 }
 
 void launchkernelinstream(void *devPtr, cudaStream_t stream);

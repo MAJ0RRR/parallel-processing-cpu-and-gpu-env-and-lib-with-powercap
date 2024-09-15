@@ -382,6 +382,60 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
+      if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQ) {
+
+        // in this case in the message there is a serialized pointer and data so we need to find out the size first
+
+        int rsize;
+        MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rsize);
+
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        void *devPtr = *((void **)rdata);
+        void *srcPtr = rdata + sizeof(void *);
+        size_t count = rsize - sizeof(void *);
+
+        cudaError_t e = cudaErrorInvalidValue;
+
+        if (devPtr != NULL && srcPtr != NULL && count > 0)
+        {
+          memcpy(devPtr, srcPtr, rsize - sizeof(void *));
+          e = cudaSuccess; 
+        }
+
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQ) {
+
+        // in this case in the message there is a serialized pointer and size of data to fetch
+
+        int rsize = sizeof(void *) + sizeof(unsigned long);
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        void *devPtr = *((void **)rdata);
+        unsigned long count = *((unsigned long *)(rdata + sizeof(void *)));
+
+        cudaError_t e = cudaErrorInvalidValue;
+
+        size_t ssize = sizeof(cudaError_t) + count;
+        unsigned char sdata[ssize];
+
+        if (devPtr != NULL && count > 0)
+        {
+          memcpy(sdata + sizeof(cudaError_t), devPtr, count);
+          e = cudaSuccess; 
+        }
+
+        *((cudaError_t *)sdata) = e;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
 
         // in this case in the message there is a serialized pointer
