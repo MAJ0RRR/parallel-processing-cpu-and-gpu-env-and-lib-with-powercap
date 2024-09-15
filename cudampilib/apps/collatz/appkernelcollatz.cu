@@ -17,18 +17,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-__device__ int isprime(long a) {
+#define ENABLE_LOGGING
+#include "logger.h"
+
+__device__ int isprime(long a) 
+{
   long i;
-  for (i = 2; i < sqrt((double)a) + 1; i++) {
-    if ((a % i) == 0) {
+  for (i = 2; i < sqrt((double)a) + 1; i++) 
+  {
+    if ((a % i) == 0) 
+    {
       return 0;
     }
   }
-
   return 1;
 }
 
-__global__ void appkernel(void *devPtr) {
+__global__ void appkernel(void *devPtr) 
+{
   double *devPtra = (double *)(((void **)devPtr)[0]);
   double *devPtrc = (double *)(((void **)devPtr)[1]);
 
@@ -37,9 +43,10 @@ __global__ void appkernel(void *devPtr) {
   unsigned long start = devPtra[my_index];
   unsigned long counter = 0;
 
-  if (isprime(start)) {
-
-    for (; (start > 1); counter++) {
+  if (isprime(start)) 
+  {
+    for (; (start > 1); counter++) 
+    {
       start = (start % 2) ? (3 * start + 1) : (start / 2);
     }
   }
@@ -47,15 +54,15 @@ __global__ void appkernel(void *devPtr) {
   devPtrc[my_index] = counter;
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
-
-  dim3 blocksingrid(100); // 20
+extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
+{
+  dim3 blocksingrid(100);
   dim3 threadsinblock(500);
 
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
-    printf("Error during kernel launch in stream");
+    log_message(LOG_ERROR, "Error during kernel launch in stream");
   }
 }
 

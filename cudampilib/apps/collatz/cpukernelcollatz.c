@@ -18,41 +18,45 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include <stdlib.h>
 
-int isprime(long a) {
+int isprime(long a) 
+{
   long i;
-  for (i = 2; i < sqrt((double)a) + 1; i++) {
-    if ((a % i) == 0) {
+  for (i = 2; i < sqrt((double)a) + 1; i++) 
+  {
+    if ((a % i) == 0) 
+    {
       return 0;
     }
   }
-
   return 1;
 }
 
-void appkernel(void *devPtr, int num_elements, int num_threads) {
+void appkernel(void *devPtr, int num_elements, int num_threads) 
+{
   double *devPtra = (double *)(((void **)devPtr)[0]);
   double *devPtrc = (double *)(((void **)devPtr)[1]);
 
   #pragma omp parallel for num_threads(num_threads)
-  for (long my_index = 0; my_index < num_elements; my_index++) {
-    unsigned long start = devPtra[my_index];
-    unsigned long counter = 0;
+  {
+    for (long my_index = 0; my_index < num_elements; my_index++) 
+    {
+      unsigned long start = devPtra[my_index];
+      unsigned long counter = 0;
 
-    if (isprime(start)) {
-      for (; (start > 1); counter++) {
-        start = (start % 2) ? (3 * start + 1) : (start / 2);
+      if (isprime(start)) 
+      {
+        for (; (start > 1); counter++) 
+        {
+          start = (start % 2) ? (3 * start + 1) : (start / 2);
+        }
       }
+      devPtrc[my_index] = counter;
     }
-
-    devPtrc[my_index] = counter;
   }
 }
 
-extern void launchcpukernel(void *devPtr, int num_threads) {
-
-  // dim3 blocksingrid(100); // 20
-  // dim3 threadsinblock(500);
-  // num_elements = blocksingrid.x * threadsinblock.x
+extern void launchcpukernel(void *devPtr, int num_threads) 
+{
   int num_elements = 100 * 500;
   appkernel(devPtr, num_elements, num_threads);
 }

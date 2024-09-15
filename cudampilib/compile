@@ -16,7 +16,7 @@ mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampil
 #nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
 nvcc -c $APPS_DIR/$VECMAXDIV_DIR/appkernelvecmaxdiv.cu -o $BUILD_DIR/appkernelvecmaxdiv.o -Iinclude
 nvcc -c $APPS_DIR/$VECADD_DIR/appkernelvecadd.cu -o $BUILD_DIR/appkernelvecadd.o -Iinclude
-nvcc -c $APPS_DIR/$COLLATZ_DIR/appkernelcollatz.cu -o $BUILD_DIR/appkernelcollatz.o
+nvcc -c $APPS_DIR/$COLLATZ_DIR/appkernelcollatz.cu -o $BUILD_DIR/appkernelcollatz.o -Iinclude
 #nvcc -c $APPS_DIR/$PATTERSEARCH_DIR/appkernelpatternsearch.cu -o $BUILD_DIR/appkernelpatternsearch.o -Iinclude
 
 
