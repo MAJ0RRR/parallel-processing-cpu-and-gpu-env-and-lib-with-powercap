@@ -13,47 +13,46 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include "apppatternlength.h"
 
 #define ENABLE_LOGGING
 #include "logger.h"
 
-__device__ char pattern[PATTERNCOUNT][PATTERNLENGTH] = {1};
+char pattern[PATTERNCOUNT][PATTERNLENGTH] = {1};
 
-__global__ void appkernel(void *devPtr) {
+void appkernel(void *devPtr, int num_elements, int num_threads) 
+{
   char *devPtra = (char *)(((void **)devPtr)[0]);
   char *devPtrc = (char *)(((void **)devPtr)[1]);
 
-  long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-  int i, j;
-  char ok;
+  #pragma omp parallel for num_threads(num_threads)
+  {
+    for (long my_index = 0; my_index < num_elements; my_index++)
+    {
+        int i, j;
+        char ok;
 
-  devPtrc[my_index] = 0;
+        devPtrc[my_index] = 0;
 
-  for (i = 0; i < PATTERNCOUNT; i++) {
-    ok = 1;
-    for (j = 0; j < PATTERNLENGTH; j++) {
-      if (devPtra[my_index + j] != pattern[i][j]) {
-        ok = 0;
-      }
+        for (i = 0; i < PATTERNCOUNT; i++) 
+        {
+            ok = 1;
+            for (j = 0; j < PATTERNLENGTH; j++) 
+            {
+                if (devPtra[my_index + j] != pattern[i][j])
+                {
+                    ok = 0;
+                }
+            }
+            devPtrc[my_index] += ok;
+        }
     }
-    devPtrc[my_index] += ok;
   }
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
-
-  dim3 blocksingrid(100);
-  dim3 threadsinblock(500);
-
-  appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
-
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
-  }
+extern void launchcpukernel(void *devPtr,int num_threads) 
+{
+  int num_elements = 100 * 500;
+  appkernel(devPtr, num_elements, num_threads);
 }
-
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }
