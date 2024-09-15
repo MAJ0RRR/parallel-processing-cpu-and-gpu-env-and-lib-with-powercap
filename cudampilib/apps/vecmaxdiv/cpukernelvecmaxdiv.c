@@ -13,55 +13,53 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
+#include "math.h"
 
-#define ENABLE_LOGGING
-#include "logger.h"
-
-__global__ void appkernel(void *devPtr) {
+void appkernel(void *devPtr, int num_elements, int num_threads) 
+{
   double *devPtra = (double *)(((void **)devPtr)[0]);
   double *devPtrb = (double *)(((void **)devPtr)[1]);
   double *devPtrc = (double *)(((void **)devPtr)[2]);
 
-  long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-  long i;
-  long result = 1;
-
-  long max = sqrt(devPtra[my_index]);
-  long elem = devPtra[my_index];
-  for (i = 2; i < max; i++) {
-    if (!(elem % i)) {
-      if (i >= result) {
-        result = i;
-      }
+  #pragma omp parallel for num_threads(num_threads)
+  {
+    for (long my_index = 0 ; my_index < num_elements; my_index++)
+    {
+        long i;
+        long result = 1;
+        long max = sqrt(devPtra[my_index]);
+        long elem = devPtra[my_index];
+        for (i = 2; i < max; i++) 
+        {
+            if (!(elem % i)) 
+            {
+                if (i >= result) 
+                {
+                    result = i;
+                }
+            }
+        }
+        max = sqrt(devPtrb[my_index]);
+        elem = devPtrb[my_index];
+        for (i = 2; i < max; i++) 
+        {
+            if (!(elem % i)) 
+            {
+                if (i >= result) 
+                {
+                    result = i;
+                }
+            }
+        }
+        devPtrc[my_index] = result;
     }
-  }
-
-  max = sqrt(devPtrb[my_index]);
-  elem = devPtrb[my_index];
-  for (i = 2; i < max; i++) {
-    if (!(elem % i)) {
-      if (i >= result) {
-        result = i;
-      }
-    }
-  }
-
-  devPtrc[my_index] = result;
-}
-
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
-
-  dim3 blocksingrid(100);
-  dim3 threadsinblock(500);
-
-  appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
-
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
   }
 }
 
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }
+extern void launchcpukernel(void *devPtr, int num_threads) 
+{
+    int num_elements = 50000;
+    appkernel(devPtr, num_elements, num_threads);
+}
+
