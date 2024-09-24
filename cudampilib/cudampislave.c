@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
 
+int global_index = 0; // for CPU computation
 float lastEnergyMeasured = 0.0;
 
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
@@ -35,7 +36,21 @@ int __cudampi__localFreeThreadCount = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
-void launchcpukernel(void *devPtr, int thread_count);
+void launchcpukernel(void *devPtr, int myIdx);
+
+int get_idx(int max) {
+    int idx = -1;
+    
+    #pragma omp critical
+    {
+        if (global_index < max) {
+            idx = global_index;
+            global_index++;
+        }
+    }
+    
+    return idx;
+}
 
 int main(int argc, char **argv) {
 
@@ -467,12 +482,16 @@ int main(int argc, char **argv) {
 
         void *devPtr = *((void **)rdata);
 
-
         // TODO: Investigate if taskwait / lock mechanism should be implemented here
-        #pragma omp task
+        // Launch task for every free CPU threas - 1 for thread that manages CPU computation
+        for (int i = 0; i < __cudampi__localFreeThreadCount - 1; i++)
         {
-          // Launch with all free CPU threads - 1 for thread that manages CPU computation
-          launchcpukernel(devPtr, __cudampi__localFreeThreadCount - 1);
+          #pragma omp task
+          {
+            int my_idx = get_idx(num_elements);
+            while (my_idx != -1)
+                launchcpukernel(devPtr, my_idx);
+          }
         }
 
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);

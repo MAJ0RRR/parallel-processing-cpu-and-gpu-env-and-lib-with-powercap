@@ -29,30 +29,28 @@ int isprime(long a) {
   return 1;
 }
 
-void appkernel(void *devPtr, int num_elements, int num_threads) {
+void appkernel(void *devPtr, int num_elements, int my_index) {
   double *devPtra = (double *)(((void **)devPtr)[0]);
   double *devPtrc = (double *)(((void **)devPtr)[1]);
 
-  #pragma omp parallel for num_threads(num_threads)
-  for (long my_index = 0; my_index < num_elements; my_index++) {
-    unsigned long start = devPtra[my_index];
-    unsigned long counter = 0;
+  unsigned long start = devPtra[my_index];
+  unsigned long counter = 0;
 
-    if (isprime(start)) {
-      for (; (start > 1); counter++) {
-        start = (start % 2) ? (3 * start + 1) : (start / 2);
-      }
+  if (isprime(start)) {
+    for (; (start > 1); counter++) {
+      start = (start % 2) ? (3 * start + 1) : (start / 2);
     }
-
-    devPtrc[my_index] = counter;
   }
+
+  devPtrc[my_index] = counter;
+
 }
 
-extern void launchcpukernel(void *devPtr, int num_threads) {
+extern void launchcpukernel(void *devPtr, int myIdx) {
 
   // dim3 blocksingrid(100); // 20
   // dim3 threadsinblock(500);
   // num_elements = blocksingrid.x * threadsinblock.x
   int num_elements = 100 * 500;
-  appkernel(devPtr, num_elements, num_threads);
+  appkernel(devPtr, num_elements, myIdx);
 }
