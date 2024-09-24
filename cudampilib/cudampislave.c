@@ -35,7 +35,7 @@ int __cudampi__localFreeThreadCount = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
-void launchcpukernel(void *devPtr, int thread_count);
+void launchcpukernel(void *devPtr);
 
 int main(int argc, char **argv) {
 
@@ -472,7 +472,7 @@ int main(int argc, char **argv) {
         #pragma omp task
         {
           // Launch with all free CPU threads - 1 for thread that manages CPU computation
-          launchcpukernel(devPtr, __cudampi__localFreeThreadCount - 1);
+          launchcpukernel(devPtr);
         }
 
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
