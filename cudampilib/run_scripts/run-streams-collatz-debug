@@ -2,4 +2,10 @@
 
 BUILD_DIR="build"
 
-mpirun -np 1 ./$BUILD_DIR/app-streams-collatz $2 $3 : -np $1 ./$BUILD_DIR/cudampislave-collatz
+mpirun \
+  --mca orte_keep_fqdn_hostnames t \
+  --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+  --bind-to none \
+  --report-bindings \
+  --host 172.20.83.203 -np 1 ./$BUILD_DIR/app-streams-collatz $1 $2 : \
+  --host 172.20.83.201 -np 1 ./$BUILD_DIR/cudampislave-collatz

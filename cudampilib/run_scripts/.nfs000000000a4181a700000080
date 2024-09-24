@@ -1,0 +1,6 @@
+mpirun \
+  --mca orte_keep_fqdn_hostnames t \
+  --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+  --report-bindings \
+  --host 172.20.83.203 -np 1 ./build/app-streams-collatz : \
+  --host 172.20.83.201 -np 1 ./build/cudampislave-collatz
