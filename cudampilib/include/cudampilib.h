@@ -62,7 +62,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
 
 void __cudampi__kernel(void *devPtr);
 
-void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream);
+void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream);
 
 void __cudampi__cpuKernel(void *devPtr);
 
@@ -75,3 +75,15 @@ cudaError_t  __cudampi__getDeviceCount (int *count);
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream);
+
+#ifdef ALLOW_CPU_STREAMS
+cudaError_t __cudampi__streamCreate(cudaStream_t *stream);
+
+cudaError_t __cudampi__streamDestroy(cudaStream_t stream);
+
+cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream);
+
+cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream);
+
+void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream);
+#endif

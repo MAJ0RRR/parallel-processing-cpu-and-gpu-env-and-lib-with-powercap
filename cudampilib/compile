@@ -11,7 +11,7 @@ VECMAXDIV_DIR="vecmaxdiv"
 mkdir -p $BUILD_DIR
 
 gcc -c cudampicommon.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampicommon.o
-mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampilib.o 
+mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampilib.o  -DALLOW_CPU_STREAMS
 #nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
 #nvcc -c $APPS_DIR/$VECMAXDIV_DIR/appkernelvecmaxdiv.cu -o $BUILD_DIR/appkernelvecmaxdiv.o -Iinclude
 #nvcc -c $APPS_DIR/$VECADD_DIR/appkernelvecadd.cu -o $BUILD_DIR/appkernelvecadd.o -Iinclude
@@ -29,7 +29,7 @@ mpicc -fopenmp -o $BUILD_DIR/cudampislave-collatz cudampislave.c $BUILD_DIR/cpuk
 #mpicc -fopenmp -o $BUILD_DIR/app $APPS_DIR/$APP_DIR/app.c $BUILD_DIR/appkernel.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 #mpicc -fopenmp -o $BUILD_DIR/app-streams-vecmaxdiv $APPS_DIR/$VECMAXDIV_DIR/app-streams-vecmaxdiv.c $BUILD_DIR/appkernelvecmaxdiv.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 #mpicc -fopenmp -o $BUILD_DIR/app-streams-vecadd $APPS_DIR/$VECADD_DIR/app-streams-vecadd.c $BUILD_DIR/appkernelvecadd.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
-mpicc -fopenmp -o $BUILD_DIR/app-streams-collatz $APPS_DIR/$COLLATZ_DIR/app-streams-collatz.c $BUILD_DIR/cpukernelcollatz.o $BUILD_DIR/appkernelcollatz.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++ -lm
+mpicc -fopenmp -o $BUILD_DIR/app-streams-collatz $APPS_DIR/$COLLATZ_DIR/app-streams-collatz.c $BUILD_DIR/cpukernelcollatz.o $BUILD_DIR/appkernelcollatz.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++ -lm -DALLOW_CPU_STREAMS
 #mpicc -fopenmp -o $BUILD_DIR/app-streams-patternsearch $APPS_DIR/$PATTERSEARCH_DIR/app-streams-patternsearch.c $BUILD_DIR/appkernelpatternsearch.o $BUILD_DIR/cudampilib.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 
 echo "Build complete. Executables and object files are in '$BUILD_DIR'."
