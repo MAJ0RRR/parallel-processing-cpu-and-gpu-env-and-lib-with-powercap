@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
 
         __cudampi__cudaMemcpyAsync(devPtra, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream1);
 
-        __cudampi__kernelinstream(devPtr, stream1);
+        __cudampi__cudaKernelInStream(devPtr, stream1);
 
         __cudampi__cudaMemcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(char), cudaMemcpyDeviceToHost, stream1);
       }
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
 
             __cudampi__cudaMemcpyAsync(devPtra2, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream2);
 
-            __cudampi__kernelinstream(devPtr2, stream2);
+            __cudampi__cudaKernelInStream(devPtr2, stream2);
 
             __cudampi__cudaMemcpyAsync(vectorc + mycounter, devPtrc2, batchsize * sizeof(char), cudaMemcpyDeviceToHost, stream2);
           }

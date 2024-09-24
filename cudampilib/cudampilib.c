@@ -873,7 +873,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
 
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 
-void __cudampi__kernelinstream(void *devPtr, cudaStream_t stream) {
+void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
 
   if (__cudampi_isLocalGpu) { // run locally
     launchkernelinstream(devPtr, stream);
@@ -974,3 +974,52 @@ cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream) {
     return ((cudaError_t)rdata);
   }
 }
+
+#ifdef ALLOW_CPU_STREAMS
+
+cudaError_t __cudampi__streamCreate(cudaStream_t *stream) {
+  if (__cudampi__isCpu()) {
+    *stream = NULL;
+    return cudaSuccess;
+  }
+  // else
+  return __cudampi__cudaStreamCreate(stream);
+}
+
+cudaError_t __cudampi__streamDestroy(cudaStream_t stream) {
+  if (__cudampi__isCpu()) {
+    stream = NULL;
+    return cudaSuccess;
+  }
+  // else
+  return __cudampi__cudaStreamDestroy(stream);
+}
+
+cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
+  if (__cudampi__isCpu())
+  {
+    return __cudampi__cpuMemcpy(dst, src, count, kind);
+  }
+  // else
+  return __cudampi__cudaMemcpyAsync(dst, src, count, kind, stream);
+}
+
+cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
+  if (__cudampi__isCpu())
+  {
+    return __cudampi__cpuMemcpy(dst, src, count, kind);
+  }
+  // else
+  return __cudampi__cudaMemcpyAsync(dst, src, count, kind, stream);
+}
+
+void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream) {
+  if (__cudampi__isCpu())
+  {
+    return __cudampi__cpuKernel(devPtr);
+  }
+  // else
+  return __cudampi__cudaKernelInStream(devPtr, stream);
+}
+
+#endif
