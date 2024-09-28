@@ -34,8 +34,34 @@ static void log_message(LogLevel level, const char *format, ...) {
     
     fprintf(stderr, "\n");
 }
+static void log_message_file(LogLevel level, const char *format, ...) {
+    FILE *log_file = fopen("logfile.txt", "a");
+    if (log_file == NULL) {
+        fprintf(stderr, "Error opening log file!\n");
+        return;
+    }
+    
+    time_t now;
+    time(&now);
+    struct tm *local = localtime(&now);
+    
+    char time_str[20];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", local);
+    
+    fprintf(log_file, "[%s] [%s] ", time_str, LOG_LEVEL_NAMES[level]);
+    
+    va_list args;
+    va_start(args, format);
+    vfprintf(log_file, format, args);
+    va_end(args);
+    
+    fprintf(log_file, "\n");
+    
+    fclose(log_file);
+}
 #else
 static void log_message(LogLevel level, const char *format, ...) {}
+static void log_message_file(LogLevel level, const char *format, ...) {}
 #endif // ENABLE_LOGGING
 
 #endif // LOGGER_H

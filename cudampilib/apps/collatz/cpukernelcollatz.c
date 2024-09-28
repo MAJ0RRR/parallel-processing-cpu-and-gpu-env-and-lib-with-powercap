@@ -17,6 +17,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#define ENABLE_LOGGING
+#include "logger.h"
 
 int isprime(long a) 
 {

@@ -15,17 +15,22 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #include <stdio.h>
 
+#define ENABLE_LOGGING
+#include "logger.h"
+
 void appkernel(void *devPtr, int num_elements, int num_threads) 
 {
     double *devPtra = (double *)(((void **)devPtr)[0]);
     double *devPtrb = (double *)(((void **)devPtr)[1]);
     double *devPtrc = (double *)(((void **)devPtr)[2]);
+    log_message_file(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
 
     #pragma omp parallel for num_threads(num_threads)
     {
         for (long my_index = 0; my_index < num_elements; my_index++) 
         {
             devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+            log_message_file(LOG_DEBUG, "%f = %f + %f", devPtrc[my_index], devPtra[my_index] / 2, devPtrb[my_index] / 3);
         }
     }
 }
