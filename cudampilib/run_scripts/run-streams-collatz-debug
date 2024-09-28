@@ -1,5 +1,114 @@
 #!/bin/bash
 
 BUILD_DIR="build"
+HOSTFILE="./hostfile"
+TEMP_HOSTFILE="./temp_hostfile"
 
-mpirun -np 1 ./$BUILD_DIR/app-streams-collatz $2 $3 : -np $1 ./$BUILD_DIR/cudampislave-collatz
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+if [ "$1" == "L" ]; then
+    # Local execution
+    echo "Running locally..."
+    mpirun --mca orte_keep_fqdn_hostnames t --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo --bind-to none -np 1 ./$BUILD_DIR/app-streams-collatz $3 $4 : -np $2 ./$BUILD_DIR/cudampislave-collatz
+
+elif [ "$1" == "R" ]; then
+    # Remote execution
+    if [ -z "$2" ]; then
+        echo "Error: Number of machines must be provided as the second argument."
+        exit 1
+    fi
+
+    num_machines=$2
+
+    # Check if the number of requested machines is a valid number
+    if ! is_number "$num_machines"; then
+        echo "Error: Second argument must be a valid number."
+        exit 1
+    fi
+
+    # Count the total number of machines available in the hostfile
+    total_machines=$(wc -l < "$HOSTFILE")
+
+    # Check if the requested number of machines exceeds the available machines
+    if [ "$num_machines" -gt "$total_machines" ]; then
+        echo "Error: Requested number of machines ($num_machines) exceeds the total available ($total_machines)."
+        exit 1
+    fi
+
+    # Generate a new temporary hostfile with the requested number of machines
+    head -n "$num_machines" "$HOSTFILE" > "$TEMP_HOSTFILE"
+
+    echo "Running on $num_machines remote machines..."
+
+    # Execute the MPI program on the selected machines
+    mpirun --mca orte_keep_fqdn_hostnames t \
+           --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+           --bind-to none \
+           --machinefile "$TEMP_HOSTFILE" \
+           -np 1 ./$BUILD_DIR/app-streams-collatz $3 $4 : \
+           -np $num_machines ./$BUILD_DIR/cudampislave-collatz
+
+    # Clean up the temporary hostfile
+    rm "$TEMP_HOSTFILE"
+
+elif [ "$1" == "C" ]; then
+    # Custom machine selection mode
+    shift  # Remove the 'C' from the arguments
+
+    selected_machines=()
+    while [[ "$1" != "A" ]]; do
+        if ! is_number "$1"; then
+            echo "Error: Invalid machine number '$1'."
+            exit 1
+        fi
+
+        # Add the corresponding line from the hostfile to selected_machines
+        machine=$(sed -n "${1}p" "$HOSTFILE")
+        if [ -z "$machine" ]; then
+            echo "Error: Machine number $1 exceeds available lines in the hostfile."
+            exit 1
+        fi
+        selected_machines+=("$machine")
+
+        shift  # Move to the next argument
+    done
+
+    if [ "$1" != "A" ]; then
+        echo "Error: Expected 'A' followed by two arguments for app-streams-collatz."
+        exit 1
+    fi
+
+    shift  # Remove 'A' from the arguments
+
+    arg2=$1
+    arg3=$2
+
+    if [ -z "$arg2" ] || [ -z "$arg3" ]; then
+        echo "Error: Missing arguments for app-streams-collatz."
+        exit 1
+    fi
+
+    # Create a temporary hostfile with the selected machines
+    printf "%s\n" "${selected_machines[@]}" > "$TEMP_HOSTFILE"
+
+    num_selected_machines=${#selected_machines[@]}
+    echo "Running on the following machines: ${selected_machines[*]}"
+
+    # Execute the MPI program on the selected machines
+    mpirun --mca orte_keep_fqdn_hostnames t \
+           --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+           --bind-to none \
+           --machinefile "$TEMP_HOSTFILE" \
+           -np 1 ./$BUILD_DIR/app-streams-collatz $arg2 $arg3 : \
+           -np $num_selected_machines ./$BUILD_DIR/cudampislave-collatz
+
+    # Clean up the temporary hostfile
+    rm "$TEMP_HOSTFILE"
+
+else
+    # Invalid option for $1
+    echo "Error: Invalid argument '$1'. Use 'L' for local, 'R' for remote, or 'C' followed by machine numbers and 'A' for custom."
+    exit 1
+fi
