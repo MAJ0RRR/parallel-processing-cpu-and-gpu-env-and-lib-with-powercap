@@ -13,61 +13,58 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
+#include "math.h"
 
-#define ENABLE_LOGGING_GPU
 #define ENABLE_LOGGING
-#include "logger_gpu.h"
 #include "logger.h"
-#include "collatz_defines.h"
+#include "vecmaxdiv_defines.h"
 
-__device__ int isprime(long a) 
-{
-  long i;
-  for (i = 2; i < sqrt((double)a) + 1; i++) 
-  {
-    if ((a % i) == 0) 
-    {
-      return 0;
-    }
-  }
-  return 1;
-}
-
-__global__ void appkernel(void *devPtr) 
+void appkernel(void *devPtr, int num_elements, int num_threads) 
 {
   double *devPtra = (double *)(((void **)devPtr)[0]);
-  double *devPtrc = (double *)(((void **)devPtr)[1]);
+  double *devPtrb = (double *)(((void **)devPtr)[1]);
+  double *devPtrc = (double *)(((void **)devPtr)[2]);
 
-  long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-
-  unsigned long start = devPtra[my_index];
-  unsigned long counter = 0;
-
-  if (isprime(start)) 
+  #pragma omp parallel for num_threads(num_threads)
   {
-    for (; (start > 1); counter++) 
+    for (long my_index = 0 ; my_index < num_elements; my_index++)
     {
-      start = (start % 2) ? (3 * start + 1) : (start / 2);
+        long i;
+        long result = 1;
+        long max = sqrt(devPtra[my_index]);
+        long elem = devPtra[my_index];
+        for (i = 2; i < max; i++) 
+        {
+            if (!(elem % i)) 
+            {
+                if (i >= result) 
+                {
+                    result = i;
+                }
+            }
+        }
+        max = sqrt(devPtrb[my_index]);
+        elem = devPtrb[my_index];
+        for (i = 2; i < max; i++) 
+        {
+            if (!(elem % i)) 
+            {
+                if (i >= result) 
+                {
+                    result = i;
+                }
+            }
+        }
+        devPtrc[my_index] = result;
     }
   }
-
-  devPtrc[my_index] = counter;
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
+extern void launchcpukernel(void *devPtr, int num_threads) 
 {
-  dim3 blocksingrid(COLLATZ_BLOCKS_IN_GRID);
-  dim3 threadsinblock(COLLATZ_THREADS_IN_BLOCK);
-
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, COLLATZ_THREADS_IN_BLOCK);
-  appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
-
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
-  }
+    int num_elements = VECMAXDIV_BATCH_SIZE;
+    log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
+    appkernel(devPtr, num_elements, num_threads);
 }
 
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }

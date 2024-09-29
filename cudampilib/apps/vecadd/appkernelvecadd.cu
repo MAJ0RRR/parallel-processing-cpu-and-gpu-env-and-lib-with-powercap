@@ -17,25 +17,32 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-__global__ void appkernel(void *devPtr) {
+#define ENABLE_LOGGING_GPU
+#define ENABLE_LOGGING
+#include "logger_gpu.h"
+#include "logger.h"
+#include "vecadd_defines.h"
+
+__global__ void appkernel(void *devPtr) 
+{
   double *devPtra = (double *)(((void **)devPtr)[0]);
   double *devPtrb = (double *)(((void **)devPtr)[1]);
   double *devPtrc = (double *)(((void **)devPtr)[2]);
 
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-
   devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
+extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
+{
+  dim3 blocksingrid(VECADD_BLOCKS_IN_GRID);
+  dim3 threadsinblock(VECADD_THREADS_IN_BLOCK);
 
-  dim3 blocksingrid(100);
-  dim3 threadsinblock(1000);
-
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", VECADD_BLOCKS_IN_GRID, VECADD_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
-    printf("Error during kernel launch in stream");
+    log_message(LOG_ERROR, "Error during kernel launch in stream");
   }
 }
 
