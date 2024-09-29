@@ -9,7 +9,6 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-#include "apppatternlength.h"
 #include "cudampilib.h"
 #include <omp.h>
 #include <stdio.h>
@@ -19,13 +18,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "patternsearch_defines.h"
 
-long long VECTORSIZE = 400000000;
+long long VECTORSIZE = PATTERNSEARCH_VECTORSIZE;
 
 char *vectora;
 char *vectorc;
 
-int batchsize = 50000;
+int batchsize = PATTERNSEARCH_BATCH_SIZE;
 
 long long globalcounter = 0;
 
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
     exit(0);
   }
 
+  // Filling input
   for (long long i = 0; i < (VECTORSIZE + PATTERNLENGTH); i++) {
     vectora[i] = (1 + i) % 3;
   }
@@ -159,7 +160,7 @@ int main(int argc, char **argv)
       }
 
       privatecounter++;
-      if (privatecounter % 2) 
+      if (privatecounter % 2 == 0) 
       {
         __cudampi__deviceSynchronize();
       }

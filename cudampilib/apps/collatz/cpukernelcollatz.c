@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdlib.h>
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "collatz_defines.h"
 
 int isprime(long a) 
 {
@@ -59,6 +60,7 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
 
 extern void launchcpukernel(void *devPtr, int num_threads) 
 {
-  int num_elements = 100 * 500;
+  int num_elements = COLLATZ_BATCH_SIZE;
+  log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
   appkernel(devPtr, num_elements, num_threads);
 }

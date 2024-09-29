@@ -17,14 +17,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "vecadd_defines.h"
 
-#define VECTORSIZE 80000000
+#define VECTORSIZE VECADD_VECTOR_SIZE
 
 double *vectora;
 double *vectorb;
 double *vectorc;
 
-int batchsize = 100000;
+int batchsize = VECADD_BATCH_SIZE;
 
 long long globalcounter = 0;
 
@@ -51,7 +52,6 @@ int main(int argc, char **argv)
   {
     powerlimit = atof(argv[2]);
     log_message(LOG_INFO, "\nSetting power limit=%f\n", powerlimit);
-    fflush(stdout);
     __cudampi__setglobalpowerlimit(powerlimit);
   }
 
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
       }
 
       privatecounter++;
-      if (privatecounter % 30) 
+      if (privatecounter % 30 == 0) 
       {
         __cudampi__deviceSynchronize();
       }

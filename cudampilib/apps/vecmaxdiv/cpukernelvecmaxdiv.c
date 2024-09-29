@@ -16,6 +16,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include "math.h"
 
+#define ENABLE_LOGGING
+#include "logger.h"
+#include "vecmaxdiv_defines.h"
+
 void appkernel(void *devPtr, int num_elements, int num_threads) 
 {
   double *devPtra = (double *)(((void **)devPtr)[0]);
@@ -59,7 +63,8 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
 
 extern void launchcpukernel(void *devPtr, int num_threads) 
 {
-    int num_elements = 50000;
+    int num_elements = VECMAXDIV_BATCH_SIZE;
+    log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
     appkernel(devPtr, num_elements, num_threads);
 }
 

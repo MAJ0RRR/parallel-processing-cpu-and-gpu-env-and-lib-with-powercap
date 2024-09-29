@@ -17,8 +17,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+#define ENABLE_LOGGING_GPU
 #define ENABLE_LOGGING
+#include "logger_gpu.h"
 #include "logger.h"
+#include "collatz_defines.h"
 
 __device__ int isprime(long a) 
 {
@@ -56,9 +59,10 @@ __global__ void appkernel(void *devPtr)
 
 extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
 {
-  dim3 blocksingrid(100);
-  dim3 threadsinblock(500);
+  dim3 blocksingrid(COLLATZ_BLOCKS_IN_GRID);
+  dim3 threadsinblock(COLLATZ_THREADS_IN_BLOCK);
 
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, COLLATZ_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {

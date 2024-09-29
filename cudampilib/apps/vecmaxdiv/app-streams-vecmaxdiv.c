@@ -18,14 +18,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "vecmaxdiv_defines.h"
 
-long long VECTORSIZE = 200000000;
+long long VECTORSIZE = VECMAXDIV_VECTORSIZE;
 
 double *vectora;
 double *vectorb;
 double *vectorc;
 
-int batchsize = 50000;
+int batchsize = VECMAXDIV_BATCH_SIZE;
 
 long long globalcounter = 0;
 
@@ -77,10 +78,11 @@ int main(int argc, char **argv)
     exit(0);
   }
 
+  // Filling input
   for (long long i = 0; i < VECTORSIZE; i++) 
   {
-    vectora[i] = 2 * ((200000000 + i) % 1000000000) + 1;
-    vectorb[i] = 2 * ((200000000 + i) % 1000000000) + 3;
+    vectora[i] = 2 * ((VECTORSIZE + i) % 1000000000) + 1;
+    vectorb[i] = 2 * ((VECTORSIZE + i) % 1000000000) + 3;
   }
 
   gettimeofday(&start, NULL);
@@ -189,7 +191,7 @@ int main(int argc, char **argv)
       }
 
       privatecounter++;
-      if (privatecounter % 2) 
+      if (privatecounter % 2 == 0) 
       {
         __cudampi__deviceSynchronize();
       }

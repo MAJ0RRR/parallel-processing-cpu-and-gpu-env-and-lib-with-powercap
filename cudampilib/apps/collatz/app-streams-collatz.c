@@ -18,13 +18,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "collatz_defines.h"
 
-long long VECTORSIZE = 200000000;
+long long VECTORSIZE = COLLATZ_VECTORSIZE;
 
 double *vectora;
 double *vectorc;
 
-int batchsize = 50000;
+int batchsize = COLLATZ_BATCH_SIZE;
 
 long long globalcounter = 0;
 
@@ -70,9 +71,10 @@ int main(int argc, char **argv)
     exit(0);
   }
 
+  // Filling input
   for (long long i = 0; i < VECTORSIZE; i++) 
   {
-    vectora[i] = (80000000 + i) % 2000000000;
+    vectora[i] = (80000000 + i) % VECTORSIZE;
   }
 
   gettimeofday(&start, NULL);

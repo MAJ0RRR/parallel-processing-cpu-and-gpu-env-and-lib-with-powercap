@@ -14,10 +14,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // in OpenCL we could hide any kernel invocation
 
 #include <stdio.h>
-#include "apppatternlength.h"
 
 #define ENABLE_LOGGING
 #include "logger.h"
+#include "patternsearch_defines.h"
 
 char pattern[PATTERNCOUNT][PATTERNLENGTH] = {1};
 
@@ -53,6 +53,7 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
 
 extern void launchcpukernel(void *devPtr,int num_threads) 
 {
-  int num_elements = 100 * 500;
+  int num_elements = PATTERNSEARCH_BATCH_SIZE;
+  log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
   appkernel(devPtr, num_elements, num_threads);
 }
