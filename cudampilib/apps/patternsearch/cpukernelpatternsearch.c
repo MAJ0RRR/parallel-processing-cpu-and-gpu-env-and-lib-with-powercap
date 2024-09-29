@@ -13,61 +13,47 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 // consequently we only need to copy a pointer in kernel invocation
 // in OpenCL we could hide any kernel invocation
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
 
-#define ENABLE_LOGGING_GPU
 #define ENABLE_LOGGING
-#include "logger_gpu.h"
 #include "logger.h"
-#include "collatz_defines.h"
+#include "patternsearch_defines.h"
 
-__device__ int isprime(long a) 
+char pattern[PATTERNCOUNT][PATTERNLENGTH] = {1};
+
+void appkernel(void *devPtr, int num_elements, int num_threads) 
 {
-  long i;
-  for (i = 2; i < sqrt((double)a) + 1; i++) 
+  char *devPtra = (char *)(((void **)devPtr)[0]);
+  char *devPtrc = (char *)(((void **)devPtr)[1]);
+
+  #pragma omp parallel for num_threads(num_threads)
   {
-    if ((a % i) == 0) 
+    for (long my_index = 0; my_index < num_elements; my_index++)
     {
-      return 0;
+        int i, j;
+        char ok;
+
+        devPtrc[my_index] = 0;
+
+        for (i = 0; i < PATTERNCOUNT; i++) 
+        {
+            ok = 1;
+            for (j = 0; j < PATTERNLENGTH; j++) 
+            {
+                if (devPtra[my_index + j] != pattern[i][j])
+                {
+                    ok = 0;
+                }
+            }
+            devPtrc[my_index] += ok;
+        }
     }
   }
-  return 1;
 }
 
-__global__ void appkernel(void *devPtr) 
+extern void launchcpukernel(void *devPtr,int num_threads) 
 {
-  double *devPtra = (double *)(((void **)devPtr)[0]);
-  double *devPtrc = (double *)(((void **)devPtr)[1]);
-
-  long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-
-  unsigned long start = devPtra[my_index];
-  unsigned long counter = 0;
-
-  if (isprime(start)) 
-  {
-    for (; (start > 1); counter++) 
-    {
-      start = (start % 2) ? (3 * start + 1) : (start / 2);
-    }
-  }
-
-  devPtrc[my_index] = counter;
+  int num_elements = PATTERNSEARCH_BATCH_SIZE;
+  log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
+  appkernel(devPtr, num_elements, num_threads);
 }
-
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
-{
-  dim3 blocksingrid(COLLATZ_BLOCKS_IN_GRID);
-  dim3 threadsinblock(COLLATZ_THREADS_IN_BLOCK);
-
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, COLLATZ_THREADS_IN_BLOCK);
-  appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
-
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
-  }
-}
-
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }

@@ -17,8 +17,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#include "apppatternlength.h"
-
+#define ENABLE_LOGGING_GPU
+#define ENABLE_LOGGING
+#include "logger_gpu.h"
+#include "logger.h"
+#include "patternsearch_defines.h"
 __device__ char pattern[PATTERNCOUNT][PATTERNLENGTH] = {1};
 
 __global__ void appkernel(void *devPtr) {
@@ -44,13 +47,14 @@ __global__ void appkernel(void *devPtr) {
 
 extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
 
-  dim3 blocksingrid(100); // 100
-  dim3 threadsinblock(500);
+  dim3 blocksingrid(PATTERNSEARCH_BLOCKS_IN_GRID);
+  dim3 threadsinblock(PATTERNSEARCH_THREADS_IN_BLOCK);
 
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", PATTERNSEARCH_BLOCKS_IN_GRID, PATTERNSEARCH_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
-    printf("Error during kernel launch in stream");
+    log_message(LOG_ERROR, "Error during kernel launch in stream");
   }
 }
 
