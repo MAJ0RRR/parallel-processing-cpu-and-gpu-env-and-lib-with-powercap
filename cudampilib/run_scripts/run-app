@@ -1,0 +1,119 @@
+#!/bin/bash
+
+BUILD_DIR="build"
+HOSTFILE="./hostfile"
+TEMP_HOSTFILE="./temp_hostfile"
+
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+# Basic check
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <app_name> <L|C> <args...>"
+    exit 1
+fi
+
+APP_NAME="$1"
+MODE="$2"
+
+if [ $# -gt 1 ]; then
+    echo "All arguments provided:"
+    echo "====================================="
+    echo "APP_NAME: '$APP_NAME'"
+    echo "MODE: '$MODE'"
+fi
+
+if [ "$1" == "H" ]; then
+    echo "There are 2 modes:"
+    echo "Local: ex. ./run_scripts/run-app vecadd L 7 1 30 - run app vecadd locally with 7 slave proccesses \
+and 1 stream for GPU with 30 as powercap value"
+    echo "Choose: ex ./run_scripts/run-app vecadd C 2 4 6 8 10 A 1 30 - run app vecadd remotly on KASK server with 5 slave processes \
+(each on different machine: des02, des04, des06, des08, des10) with 1 stream for GPU and 30 as powercap value, 'A' separates arguments from machines"
+
+elif [ $2 == "L" ]; then
+    # Local execution
+    SLAVE_PROC_AMOUNT="$3"
+    STREAMS_COUNT="$4"
+    POWER_CAP="$5"
+
+    echo "SLAVE_PROC_AMOUNT: '$SLAVE_PROC_AMOUNT'"
+    echo "STREAMS_COUNT: '$STREAMS_COUNT'"
+    echo "POWER_CAP: '$POWER_CAP'"
+    echo "====================================="
+
+    echo "Running locally with application '$APP_NAME'..."
+
+    mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
+--mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+-np 1 ./$BUILD_DIR/app-streams-$APP_NAME $STREAMS_COUNT $POWER_CAP \
+: -np $3 ./$BUILD_DIR/cudampislave-$APP_NAME"
+                  
+    echo "Command: $mpi_command"
+    echo "====================================="
+    eval "$mpi_command"
+elif [ "$MODE" == "C" ]; then
+    # Custom machine selection mode
+    shift  # Remove the 'APP_NAME' from the arguments
+    shift  # Remove the 'MODE' from the arguments
+
+    selected_machines=()
+    while [[ "$1" != "A" ]]; do
+        if ! is_number "$1"; then
+            echo "Error: Invalid machine number '$1'."
+            exit 1
+        fi
+
+        # Add the corresponding line from the hostfile to selected_machines
+        machine=$(sed -n "${1}p" "$HOSTFILE")
+        if [ -z "$machine" ]; then
+            echo "Error: Machine number $1 exceeds available lines in the hostfile."
+            exit 1
+        fi
+        selected_machines+=("$machine")
+
+        echo "Selected machine: $machine."
+
+        shift  # Move to the next argument
+    done
+
+    if [ "$1" != "A" ]; then
+        echo "Error: Expected 'A' followed by two arguments for app-streams-vecadd."
+        exit 1
+    fi
+
+    shift  # Remove 'A' from the arguments
+
+    SLAVE_PROC_AMOUNT=${#selected_machines[@]}
+    STREAMS_COUNT=$1
+    POWER_CAP=$2
+    echo "SLAVE_PROC_AMOUNT: '$SLAVE_PROC_AMOUNT'"
+    echo "STREAMS_COUNT: '$STREAMS_COUNT'"
+    echo "POWER_CAP: '$POWER_CAP'"
+    echo "====================================="
+
+    # Create a temporary hostfile with the selected machines
+    printf "%s\n" "${selected_machines[@]}" > "$TEMP_HOSTFILE"
+
+    num_selected_machines=${#selected_machines[@]}
+    echo "Running on the following machines: ${selected_machines[*]}"
+    echo "Running remotly with application '$APP_NAME'..."
+
+    mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
+--mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+--bind-to none \
+--machinefile \"$TEMP_HOSTFILE\" \
+-np 1 ./$BUILD_DIR/app-streams-$APP_NAME $STREAMS_COUNT $POWER_CAP \
+: -np 1 ./$BUILD_DIR/cudampislave-$APP_NAME"
+                  
+    echo "Command: $mpi_command"
+    echo "====================================="
+    eval "$mpi_command"
+
+    # Clean up the temporary hostfile
+    rm "$TEMP_HOSTFILE"
+else
+    # Invalid option for $1
+    echo "Error: Invalid argument '$1'. Use 'H' for help, 'L' for local, , or 'C' for custom."
+    exit 1
+fi
