@@ -58,6 +58,9 @@ omp_lock_t task_available_locks[CPU_STREAMS_SUPPORTED];
 omp_lock_t synchronize_locks[CPU_STREAMS_SUPPORTED];
 
 int scheduledTasksInStream[CPU_STREAMS_SUPPORTED];
+omp_lock_t cpuEnergyLock;
+int cpuEnergyMeasured = 0;
+
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
@@ -740,6 +743,19 @@ int main(int argc, char **argv) {
 
       if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
         int rsize = sizeof(void *) + sizeof(unsigned long);
+        if (!cpuEnergyMeasured)
+        {
+          // Initialize CPU energy value
+          omp_set_lock(&cpuEnergyLock);
+          if (!cpuEnergyMeasured)
+          {
+            cpuEnergyMeasured = 1;
+            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured));
+          }
+          omp_unset_lock(&cpuEnergyLock);
+        }
+        // in this case in the message there is a serialized pointer
+
         unsigned char rdata[rsize];
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
