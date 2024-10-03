@@ -46,7 +46,7 @@ void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
 
-void allocateTaskDependency(void (*task_func)(void))
+void allocateTaskDependency(void (*task_func)(void *), void *arg)
 {
   // TODO: Maybe reference counting would be a simpler approach ?
 
@@ -91,7 +91,7 @@ void allocateTaskDependency(void (*task_func)(void))
     #pragma omp task depend(out: new_dep->dep_var)
     {
       // Execute the task function
-      task_func();
+      task_func(arg);
 
       // Free the current dependency node if there are no other tasks depending on it
       omp_set_lock(&dep_lock);
@@ -108,7 +108,7 @@ void allocateTaskDependency(void (*task_func)(void))
       #pragma omp task depend(in: new_dep->prev->dep_var) depend(out: new_dep->dep_var)
       {
         // Execute the task function
-        task_func();
+        task_func(arg);
 
         omp_set_lock(&dep_lock);
 
@@ -260,14 +260,14 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cudampi__CPUMALLOCREQ) {
-
+      typedef struct CpuMallocArgs {
         unsigned long rdata;
+      }
 
-        MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+      void cpuMallocTask(void* arg) {
+        CpuMallocArgs *args = (CpuMallocArgs*) arg;
 
-        // allocate memory on the current GPU
-        void *devPtr = malloc((size_t)rdata);
+        void *devPtr = malloc((size_t)args->rdata);
 
         int ssize = sizeof(void *) + sizeof(cudaError_t);
         // send confirmation with the actual pointer
@@ -280,6 +280,18 @@ int main(int argc, char **argv) {
         *((cudaError_t *)(sdata + sizeof(void *))) = e;
 
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
+
+        free(arg);
+      }
+
+      if (status.MPI_TAG == __cudampi__CPUMALLOCREQ) {
+
+        unsigned long rdata;
+
+        MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        CpuMallocArgs* args = malloc(sizeof(CpuMallocArgs));
+        allocateTaskDependency(cpuMallocTask, args);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
