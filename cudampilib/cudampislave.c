@@ -33,6 +33,9 @@ int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
+omp_lock_t cpuEnergyLock;
+int cpuEnergyMeasured = 0;
+
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
@@ -457,7 +460,17 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCPUKERNELREQ) {
-
+        if (!cpuEnergyMeasured)
+        {
+          // Initialize CPU energy value
+          omp_set_lock(&cpuEnergyLock);
+          if (!cpuEnergyMeasured)
+          {
+            cpuEnergyMeasured = 1;
+            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured));
+          }
+          omp_unset_lock(&cpuEnergyLock);
+        }
         // in this case in the message there is a serialized pointer
 
         int rsize = sizeof(void *);
