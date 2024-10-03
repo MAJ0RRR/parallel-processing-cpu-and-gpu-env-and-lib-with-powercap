@@ -33,15 +33,111 @@ int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
+typedef struct dep_node {
+    int dep_var;
+    struct dep_node *next;
+    struct dep_node *prev;
+} dep_node_t;
+
+dep_node_t *last_dep = NULL; // Pointer to the last dependency node
+omp_lock_t dep_lock;
+
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
+
+void allocateTaskDependency(void (*task_func)(void))
+{
+  // TODO: Maybe reference counting would be a simpler approach ?
+
+  // The idea here is to keep a list of task dependencies
+  // If new task executes and there are no previous dependencies,
+  // just execute it and keep the list entry
+  // When new task executes and there are previous dependencies,
+  // execute it and after finishing clear previous entry
+  //
+  // EXAMPLE: 3 tasks are scheduled one after another
+  // 
+  // 1) First task is scheduled and dependency created
+  // 2) Second task is scheduled and dependency added to list
+  // 3) First task finishes and does nothing since there's next dependency
+  // 4) Second task start sexecuting
+  // 5) Third task is scheduled and dependency added to list
+  // 6) Second Task finishes, removing first dependency
+  // 7) Third task finishes, removing second dependency and itself since there are no next dependencies
+  // 8) Dependency list is empty
+  dep_node_t *new_dep = (dep_node_t *)malloc(sizeof(dep_node_t));
+  if (new_dep == NULL) {
+    fprintf(stderr, "Error allocating memory for dependency node.\n");
+    return;
+  }
+  new_dep->dep_var = 0;
+  new_dep->next = NULL;
+  new_dep->prev = NULL;
+
+  // Lock to safely update the dependency chain
+  omp_set_lock(&dep_lock);
+  new_dep->prev = last_dep;
+
+  if (last_dep != NULL) {
+    last_dep->next = new_dep;
+  }
+
+  last_dep = new_dep;
+  omp_unset_lock(&dep_lock);
+
+  if (new_dep->prev == NULL) {
+    // First task has no 'in' dependency
+    #pragma omp task depend(out: new_dep->dep_var)
+    {
+      // Execute the task function
+      task_func();
+
+      // Free the current dependency node if there are no other tasks depending on it
+      omp_set_lock(&dep_lock);
+      if (new_dep->next == NULL)
+      {
+        free(new_dep);
+        // there are no next dependencies, so list is empty
+        last_dep = NULL;
+      }
+      omp_unset_lock(&dep_lock);
+    }
+  } else {
+      // Subsequent tasks depend on the previous task
+      #pragma omp task depend(in: new_dep->prev->dep_var) depend(out: new_dep->dep_var)
+      {
+        // Execute the task function
+        task_func();
+
+        omp_set_lock(&dep_lock);
+
+        // Free the previous dependency node if it hasn't been freed
+        if (new_dep->prev != NULL) {
+          if (new_dep->prev->next == new_dep) {
+            free(new_dep->prev);
+            new_dep->prev = NULL;
+          }
+        }
+
+        // Free the current dependency node if there are no other tasks depending on it
+        if (new_dep->next == NULL) {
+          free(new_dep);
+          // there are no next dependencies, so list is empty
+          last_dep = NULL;
+        }
+
+        omp_unset_lock(&dep_lock);
+      }
+  }
+}
 
 int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
 
+  omp_init_lock(&dep_lock);
   int mtsprovided;
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
@@ -537,4 +633,5 @@ int main(int argc, char **argv) {
   }
 
   MPI_Finalize();
+  omp_destroy_lock(&dep_lock);
 }
