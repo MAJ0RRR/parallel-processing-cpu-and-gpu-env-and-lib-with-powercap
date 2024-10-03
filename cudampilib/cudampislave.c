@@ -260,11 +260,11 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cpumpi__CPUMALLOCREQ) {
+      if (status.MPI_TAG == __cudampi__CPUMALLOCREQ) {
 
         unsigned long rdata;
 
-        MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cpumpi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+        MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         // allocate memory on the current GPU
         void *devPtr = malloc((size_t)rdata);
@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
         cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
         *((cudaError_t *)(sdata + sizeof(void *))) = e;
 
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
@@ -296,12 +296,12 @@ int main(int argc, char **argv) {
         MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIFREERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cpumpi__CPUFREEREQ) {
+      if (status.MPI_TAG == __cudampi__CPUFREEREQ) {
 
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
 
-        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         void *devPtr = *((void **)rdata);
         cudaError_t e = cudaErrorInvalidDevicePointer;
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
           e = cudaSuccess;
         }
 
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
@@ -552,14 +552,14 @@ int main(int argc, char **argv) {
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
-      if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCPUKERNELREQ) {
+      if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
 
         // in this case in the message there is a serialized pointer
 
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
 
-        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         void *devPtr = *((void **)rdata);
 
@@ -571,7 +571,7 @@ int main(int argc, char **argv) {
           launchcpukernel(devPtr, __cudampi__localFreeThreadCount - 1);
         }
 
-        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {

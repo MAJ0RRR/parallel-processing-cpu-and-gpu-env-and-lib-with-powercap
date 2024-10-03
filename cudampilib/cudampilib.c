@@ -518,13 +518,13 @@ cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
 
   unsigned long sdata = size; // how many bytes to allocate on the CPU
 
-  MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1, __cpumpi__CPUMALLOCREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)(&sdata), 1, MPI_UNSIGNED_LONG, 1, __cudampi__CPUMALLOCREQ, __cudampi__currentCommunicator);
 
   int rsize = sizeof(void *) + sizeof(cudaError_t);
   // receive confirmation with the actual pointer
   unsigned char rdata[rsize];
 
-  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUMALLOCRESP, __cudampi__currentCommunicator, NULL);
 
   *devPtr = *((void **)rdata);
 
@@ -570,12 +570,12 @@ cudaError_t __cudampi__cpuFree(void *devPtr) {
 
   *((void **)sdata) = devPtr;
 
-  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUFREEREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUFREEREQ, __cudampi__currentCommunicator);
 
   int rsize = sizeof(cudaError_t);
   unsigned char rdata[rsize];
 
-  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cpumpi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
 
   return *((cudaError_t *)rdata);
 }
@@ -924,9 +924,9 @@ void __cudampi__cpuKernel(void *devPtr){
 
   *((void **)sdata) = devPtr;
 
-  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCPUKERNELREQ, __cudampi__currentCommunicator);
+  MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELREQ, __cudampi__currentCommunicator);
 
-  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCPUKERNELRESP, __cudampi__currentCommunicator, NULL);
+  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
