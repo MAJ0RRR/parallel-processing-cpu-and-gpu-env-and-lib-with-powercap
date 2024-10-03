@@ -56,8 +56,6 @@ struct timeval __cudampi__time[__CUDAMPI_MAX_THREAD_COUNT];      // last time me
 int __cudampi__timemeasured[__CUDAMPI_MAX_THREAD_COUNT] = {0};   // whether time measurement started
 float __cudampi__devicepower[__CUDAMPI_MAX_THREAD_COUNT];        // current power taken by a device
 
-float __cudampi__inverseDeviceEnergyUsed[__CUDAMPI_MAX_THREAD_COUNT] = {0}; // energy used by the device between measurements
-
 int __cudampi__deviceenabled[__CUDAMPI_MAX_THREAD_COUNT]; // whether the given device is enabled for further use
 
 omp_lock_t __cudampi__devicelocks[__CUDAMPI_MAX_THREAD_COUNT]; // locks that guard writing to and reading from power and time values for particular devices
@@ -263,15 +261,16 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
 
   printf("\nggg");
   fflush(stdout);
-
   int managerselected = 0;
   do {
     curperfpower = 0;
     indexselected = -1;
     for (i = 0; i < __cudampi_totaldevicecount; i++) {
+      
+      float inverseDeviceEnergyUsed = computeDevPerformance(__cudampi__time[i]) / __cudampi__devicepower[i];
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
-          (__cudampi__inverseDeviceEnergyUsed[i] > curperfpower)) {
-        curperfpower = __cudampi__inverseDeviceEnergyUsed[i];
+          (inverseDeviceEnergyUsed > curperfpower)) {
+        curperfpower = inverseDeviceEnergyUsed;
         indexselected = i;
         anydeviceenabled = 1;
       }
@@ -748,7 +747,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       // decode and store power consumption for the device
 
       energy = *((float *)(rdata + sizeof(cudaError_t)));
-      __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = 1/energy;
       process_queue();
     }
     else
@@ -762,12 +760,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       // decode and store power consumption for the device
 
       power = *((float *)(rdata + sizeof(cudaError_t)));
-
-      if (power != (-1)) {
-        omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-        __cudampi__devicepower[__cudampi__currentDevice] = power;
-        omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-      }
     }
 
     retVal = ((cudaError_t)rdata);
@@ -786,18 +778,17 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
 
-    if (__cudampi__isCpu()){
-      if (energy != (-1)) {
-        double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
-        omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-        __cudampi__devicepower[__cudampi__currentDevice] = energy / time_in_seconds;
-        omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-      }
+    if (__cudampi__isCpu() && (energy != -1)){
+      double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
+      power = energy / time_in_seconds;
     }
-    else {
-      // time and power are already measured, so it's possible to compute energy used by the device
-      __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = computeDevPerformance(__cudampi__time[__cudampi__currentDevice]) / __cudampi__devicepower[__cudampi__currentDevice];
+
+    if (power != (-1)) {
+      omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+      __cudampi__devicepower[__cudampi__currentDevice] = power;
+      omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
     }
+    
   } else {
     __cudampi__timemeasured[__cudampi__currentDevice] = 1;
     gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);
