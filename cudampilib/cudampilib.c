@@ -786,7 +786,15 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
 
-    if (!__cudampi__isCpu()){
+    if (__cudampi__isCpu()){
+      if (energy != (-1)) {
+        double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
+        omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+        __cudampi__devicepower[__cudampi__currentDevice] = energy / time_in_seconds;
+        omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+      }
+    }
+    else {
       // time and power are already measured, so it's possible to compute energy used by the device
       __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = computeDevPerformance(__cudampi__time[__cudampi__currentDevice]) / __cudampi__devicepower[__cudampi__currentDevice];
     }
