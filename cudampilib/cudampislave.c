@@ -18,6 +18,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
+#define ENABLE_LOGGING
+#include "logger.h"
+
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
 
@@ -46,31 +49,36 @@ void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
 
-typedef struct CpuMallocArgs {
+typedef struct cpu_malloc_args {
   unsigned long rdata;
-}
+  MPI_Comm* comm;
+} cpu_malloc_args_t;
 
-typedef struct CpuFreeArgs {
+typedef struct cpu_free_args {
   void *devPtr;
-}
+  MPI_Comm* comm;
+} cpu_free_args_t;
 
-typedef struct CpuHostToDeviceArgs {
+typedef struct cpu_host_to_device_args {
   void *devPtr;
   void *srcPtr;
   size_t count;
-}
+  MPI_Comm* comm;
+} cpu_host_to_device_args_t;
 
-typedef struct CpuDeviceToHostArgs {
+typedef struct cpu_device_to_host_args {
   void *devPtr;
   unsigned long count;
-}
+  MPI_Comm* comm;
+} cpu_device_to_host_args_t;
 
-typedef struct CpuLaunchKernelArgs {
+typedef struct cpu_launch_kernel_args {
   void *devPtr;
-}
+  MPI_Comm* comm;
+} cpu_launch_kernel_args_t;
 
 void cpuMallocTask(void* arg) {
-  CpuMallocArgs *args = (CpuMallocArgs*) arg;
+  cpu_malloc_args_t *args = (cpu_malloc_args_t*) arg;
 
   void *devPtr = malloc((size_t)args->rdata);
 
@@ -84,13 +92,12 @@ void cpuMallocTask(void* arg) {
   cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
   *((cudaError_t *)(sdata + sizeof(void *))) = e;
 
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
-
+  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, *(args->comm));
   free(arg);
 }
 
 void cpuFreeTask(void* arg) {
-  CpuFreeArgs *args = (CpuFreeArgs*) arg;
+  cpu_free_args_t *args = (cpu_free_args_t*) arg;
   cudaError_t e = cudaErrorInvalidDevicePointer;
 
   if (args->devPtr != NULL) {
@@ -98,13 +105,13 @@ void cpuFreeTask(void* arg) {
     e = cudaSuccess;
   }
 
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREERESP, *(args->comm));
 
   free(arg);
 }
 
 void cpuHostToDeviceTask(void* arg) {
-  CpuHostToDeviceArgs *args = (CpuHostToDeviceArgs*) arg;
+  cpu_host_to_device_args_t *args = (cpu_host_to_device_args_t*) arg;
   cudaError_t e = cudaErrorInvalidValue;
 
   if (args->devPtr != NULL && args->srcPtr != NULL && args->count > 0) {
@@ -112,13 +119,13 @@ void cpuHostToDeviceTask(void* arg) {
     e = cudaSuccess;
   }
 
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, *(args->comm));
 
   free(arg);
 }
 
 void cpuDeviceToHostTask(void* arg) {
-  CpuDeviceToHostArgs *args = (CpuDeviceToHostArgs*) arg;
+  cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
   cudaError_t e = cudaErrorInvalidValue;
 
   size_t ssize = sizeof(cudaError_t) + args->count;
@@ -130,13 +137,13 @@ void cpuDeviceToHostTask(void* arg) {
   }
 
   *((cudaError_t *)sdata) = e;
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__communicators[omp_get_thread_num()]);
+  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, *(args->comm));
 
   free(arg);
 }
 
 void cpuHostToDeviceTaskAsync(void* arg) {
-  CpuHostToDeviceArgs *args = (CpuHostToDeviceArgs*) arg;
+  cpu_host_to_device_args_t *args = (cpu_host_to_device_args_t*) arg;
 
   memcpy(args->devPtr, args->srcPtr, args->count);
 
@@ -144,7 +151,7 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 }
 
 void cpuDeviceToHostTaskAsync(void* arg) {
-  CpuDeviceToHostArgs *args = (CpuDeviceToHostArgs*) arg;
+  cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
 
   size_t ssize = sizeof(cudaError_t) + args->count;
   unsigned char sdata[ssize];
@@ -155,11 +162,11 @@ void cpuDeviceToHostTaskAsync(void* arg) {
 }
       
 void cpuLaunchKernelTask(void* arg) {
-  CpuLaunchKernelArgs *args = (CpuLaunchKernelArgs*) arg;
+  cpu_launch_kernel_args_t *args = (cpu_launch_kernel_args_t*) arg;
 
   launchcpukernel(args->devPtr, __cudampi__localFreeThreadCount - 1);
 
-  MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+  MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, *(args->comm));
 
   free(arg);
 }
@@ -205,12 +212,16 @@ void allocateCpuTask(void (*task_func)(void *), void *arg, int id)
   omp_unset_lock(&dep_lock);
   
   
-  log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d", id);
+  printf("Created CPU task dependency node. Task ID = %d\n", id);
+  fflush(stdout);
   if (new_dep->prev == NULL) {
+      printf("DEP = NULL\n");
+  fflush(stdout);
     // First task has no 'in' dependency
-    #pragma omp task depend(out: new_dep->dep_var)
+    #pragma omp task untied depend(out: new_dep->dep_var)
     {
-      log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d", id);
+      printf("Launching CPU task. Task ID = %d\n", id);
+  fflush(stdout);
       // Execute the task function
       task_func(arg);
 
@@ -223,13 +234,19 @@ void allocateCpuTask(void (*task_func)(void *), void *arg, int id)
         last_dep = NULL;
       }
       omp_unset_lock(&dep_lock);
-      log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d", id);
+      printf("Finished CPU task execution. Task ID = %d\n", id);
+  fflush(stdout);
     }
+      printf("AFTER TASK\n");
+  fflush(stdout);
   } else {
+      printf("DEP != NULL\n");
+  fflush(stdout);
       // Subsequent tasks depend on the previous task
-      #pragma omp task depend(in: new_dep->prev->dep_var) depend(out: new_dep->dep_var)
+      #pragma omp task untied depend(in: new_dep->prev->dep_var) depend(out: new_dep->dep_var)
       {
-        log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d", id);
+        printf("Launching CPU task. Task ID = %d\n", id);
+  fflush(stdout);
         // Execute the task function
         task_func(arg);
 
@@ -251,8 +268,12 @@ void allocateCpuTask(void (*task_func)(void *), void *arg, int id)
         }
 
         omp_unset_lock(&dep_lock);
-        log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d", id);
+        printf("Finished CPU task execution. Task ID = %d\n", id);
+  fflush(stdout);
       }
+      
+      printf("AFTER TASK\n");
+  fflush(stdout);
   }
 }
 
@@ -353,14 +374,19 @@ int main(int argc, char **argv) {
   // here we need to spawn threads -- each responsible for handling one local GPU
   // spawn one thread for CPU processing if there are free cores, 0 otherwise
   int numberOfCpuThreads = __cudampi__localFreeThreadCount > 0;
-  #pragma omp parallel num_threads(__cudampi__localGpuDeviceCount + numberOfCpuThreads)
+  #pragma omp parallel num_threads(__cudampi__localGpuDeviceCount + numberOfCpuThreads + 1)
   {
 
+if (omp_get_thread_num() < __cudampi__localGpuDeviceCount + numberOfCpuThreads)
+{
+  
     MPI_Status status;
 
     // following communication needs to use dedicated communicators, not MPI_COMM_WORLD!
 
     do {
+
+
       MPI_Probe(0, MPI_ANY_TAG, __cudampi__communicators[omp_get_thread_num()], &status);
 
       if (status.MPI_TAG == __cudampi__CUDAMPIMALLOCREQ) {
@@ -390,9 +416,11 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuMallocArgs* args = malloc(sizeof(CpuMallocArgs));
-
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUMALLOCREQ");
+        cpu_malloc_args_t* args = malloc(sizeof(cpu_malloc_args_t));
+        args->rdata = rdata;
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
+        printf("Allocating CPU task for __cudampi__CPUMALLOCREQ\n");
+        fflush(stdout);
         allocateCpuTask(cpuMallocTask, args, 0);
       }
 
@@ -416,10 +444,12 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuFreeArgs* args = malloc(sizeof(CpuFreeArgs));
+        cpu_free_args_t* args = malloc(sizeof(cpu_free_args_t));
         args->devPtr = *((void **)rdata);
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUFREEREQ");
+        printf("Allocating CPU task for __cudampi__CPUFREEREQ\n");
+  fflush(stdout);
         allocateCpuTask(cpuFreeTask, args, 1);
       }
 
@@ -593,12 +623,14 @@ int main(int argc, char **argv) {
         unsigned char rdata[rsize];
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuHostToDeviceArgs* args = malloc(sizeof(CpuHostToDeviceArgs));
+        cpu_host_to_device_args_t* args = malloc(sizeof(cpu_host_to_device_args_t));
         args->devPtr = *((void **)rdata);
         args->srcPtr = rdata + sizeof(void *);
         args->count = rsize - sizeof(void *);
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQ");
+        printf("Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
+  fflush(stdout);
         allocateCpuTask(cpuHostToDeviceTask, args, 2);
       }
 
@@ -608,11 +640,13 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuDeviceToHostArgs* args = malloc(sizeof(CpuDeviceToHostArgs));
+        cpu_device_to_host_args_t* args = malloc(sizeof(cpu_device_to_host_args_t));
         args->devPtr = *((void **)rdata);
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQ");
+        printf("Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
+  fflush(stdout);
         allocateCpuTask(cpuDeviceToHostTask, args, 3);
       }
 
@@ -624,18 +658,20 @@ int main(int argc, char **argv) {
         unsigned char rdata[rsize];
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICEREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuHostToDeviceArgs* args = malloc(sizeof(CpuHostToDeviceArgs));
+        cpu_host_to_device_args_t* args = malloc(sizeof(cpu_host_to_device_args_t));
         args->devPtr = *((void **)rdata);
         args->srcPtr = rdata + sizeof(void *);
         args->count = rsize - sizeof(void *);
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         if (args->devPtr != NULL && args->srcPtr != NULL && args->count > 0) {
-          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC");
+          printf("Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
+  fflush(stdout);
           allocateCpuTask(cpuHostToDeviceTaskAsync, args, 4);
           e = cudaSuccess;
         }
 
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESPASYNC, __cudampi__communicators[omp_get_thread_num()]);
 
       }
 
@@ -646,18 +682,19 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuDeviceToHostArgs* args = malloc(sizeof(CpuDeviceToHostArgs));
+        cpu_device_to_host_args_t* args = malloc(sizeof(cpu_device_to_host_args_t));
         args->devPtr = *((void **)rdata);
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         if (args->devPtr != NULL && args->count > 0) {
-          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC");
+          printf("Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
+  fflush(stdout);
           allocateCpuTask(cpuDeviceToHostTaskAsync, args, 5);
           e = cudaSuccess;
         }
 
-        *((cudaError_t *)sdata) = e;
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
@@ -686,10 +723,12 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        CpuLaunchKernelArgs* args = malloc(sizeof(CpuLaunchKernelArgs));
+        cpu_launch_kernel_args_t* args = malloc(sizeof(cpu_launch_kernel_args_t));
         args->devPtr = *((void **)rdata);
+        args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ");
+        printf("Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
+  fflush(stdout);
         allocateCpuTask(cpuLaunchKernelTask, args, 6);
       }
 
@@ -750,7 +789,15 @@ int main(int argc, char **argv) {
 
     } while (status.MPI_TAG != __cudampi__CUDAMPIFINALIZE);
   }
+else
+{
+  while(1)
+  {
+     // TODO add handling CPU tasks here
+  }
+}
 
   MPI_Finalize();
   omp_destroy_lock(&dep_lock);
+}
 }
