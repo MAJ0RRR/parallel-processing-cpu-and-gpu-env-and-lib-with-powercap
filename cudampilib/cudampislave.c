@@ -164,7 +164,7 @@ void cpuLaunchKernelTask(void* arg) {
   free(arg);
 }
 
-void allocateCpuTask(void (*task_func)(void *), void *arg)
+void allocateCpuTask(void (*task_func)(void *), void *arg, int id)
 {
   // TODO: Maybe reference counting would be a simpler approach ?
 
@@ -203,11 +203,14 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
 
   last_dep = new_dep;
   omp_unset_lock(&dep_lock);
-
+  
+  
+  log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d", id);
   if (new_dep->prev == NULL) {
     // First task has no 'in' dependency
     #pragma omp task depend(out: new_dep->dep_var)
     {
+      log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d", id);
       // Execute the task function
       task_func(arg);
 
@@ -220,11 +223,13 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
         last_dep = NULL;
       }
       omp_unset_lock(&dep_lock);
+      log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d", id);
     }
   } else {
       // Subsequent tasks depend on the previous task
       #pragma omp task depend(in: new_dep->prev->dep_var) depend(out: new_dep->dep_var)
       {
+        log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d", id);
         // Execute the task function
         task_func(arg);
 
@@ -246,6 +251,7 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
         }
 
         omp_unset_lock(&dep_lock);
+        log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d", id);
       }
   }
 }
@@ -385,7 +391,9 @@ int main(int argc, char **argv) {
         MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CPUMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         CpuMallocArgs* args = malloc(sizeof(CpuMallocArgs));
-        allocateCpuTask(cpuMallocTask, args);
+
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUMALLOCREQ");
+        allocateCpuTask(cpuMallocTask, args, 0);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
@@ -411,7 +419,8 @@ int main(int argc, char **argv) {
         CpuFreeArgs* args = malloc(sizeof(CpuFreeArgs));
         args->devPtr = *((void **)rdata);
 
-        allocateCpuTask(cpuFreeTask, args);
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUFREEREQ");
+        allocateCpuTask(cpuFreeTask, args, 1);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
@@ -589,7 +598,8 @@ int main(int argc, char **argv) {
         args->srcPtr = rdata + sizeof(void *);
         args->count = rsize - sizeof(void *);
 
-        allocateCpuTask(cpuHostToDeviceTask, args);
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQ");
+        allocateCpuTask(cpuHostToDeviceTask, args, 2);
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQ) {
@@ -602,7 +612,8 @@ int main(int argc, char **argv) {
         args->devPtr = *((void **)rdata);
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
 
-        allocateCpuTask(cpuDeviceToHostTask, args);
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQ");
+        allocateCpuTask(cpuDeviceToHostTask, args, 3);
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQASYNC) {
@@ -619,7 +630,8 @@ int main(int argc, char **argv) {
         args->count = rsize - sizeof(void *);
 
         if (args->devPtr != NULL && args->srcPtr != NULL && args->count > 0) {
-          allocateCpuTask(cpuHostToDeviceTaskAsync, args);
+          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC");
+          allocateCpuTask(cpuHostToDeviceTaskAsync, args, 4);
           e = cudaSuccess;
         }
 
@@ -639,7 +651,8 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
 
         if (args->devPtr != NULL && args->count > 0) {
-          allocateCpuTask(cpuDeviceToHostTaskAsync, args);
+          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC");
+          allocateCpuTask(cpuDeviceToHostTaskAsync, args, 5);
           e = cudaSuccess;
         }
 
@@ -676,7 +689,8 @@ int main(int argc, char **argv) {
         CpuLaunchKernelArgs* args = malloc(sizeof(CpuLaunchKernelArgs));
         args->devPtr = *((void **)rdata);
 
-        allocateCpuTask(cpuLaunchKernelTask, args);
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ");
+        allocateCpuTask(cpuLaunchKernelTask, args, 6);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
