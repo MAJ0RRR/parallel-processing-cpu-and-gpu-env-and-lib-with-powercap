@@ -67,8 +67,10 @@ typedef struct dep_node {
     struct dep_node *prev;
 } dep_node_t;
 
+// Head and tail nodes below reffer to nodes that haven't been *scheduled* for execution
 dep_node_t *tail_dep = NULL; // Pointer to the last dependency node
 dep_node_t *head_dep = NULL; // Pointer to the first dependency node
+dep_node_t *last_dep = NULL; // Pointer to last dependency node that has not yet been executed
 omp_lock_t queue_lock;
 
 #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
@@ -239,26 +241,32 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
   new_dep->id = debugTaskCounter;
   debugTaskCounter += 1;
 
-  if (tail_dep == NULL) {
-    // Queue is empty
-    head_dep = tail_dep = new_dep;
-  } else {
-    // Add to the tail
-    tail_dep->next = new_dep;
-    new_dep->prev = tail_dep;
-    tail_dep = new_dep;
+  if (head_dep == NULL) {
+    // Queue is empty - all tasks are scheduled
+    head_dep = new_dep;
   }
+
+  tail_dep = new_dep;
+
+  if (last_dep != NULL) {
+    // Update pointers to last not executed dependency
+    // Note: last_dep does not have to be equal tail_dep if all tasks are scheduled but not all executed
+    last_dep->next = new_dep;
+    new_dep->prev = last_dep;
+  }
+
+  last_dep = new_dep;
 
   omp_unset_lock(&queue_lock);
 
   #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   // Signal the task_launcher that a task is available
   // Unlock task_available_lock to allow task_launcher to proceed
-  log_message(LOG_DEBUG, "Unsetting task lock\n");
+  log_message(LOG_WARN, "Unsetting task lock\n");
   omp_unset_lock(&task_available_lock);
   #endif
 
-  log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
+  log_message(LOG_WARN, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
 }
 
 void scheduleCpuTask(dep_node_t* current_dep_node)
@@ -280,7 +288,7 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
     // First task has no 'in' dependency
     #pragma omp task untied depend(out: current_dep_node->dep_var) 
     {
-      log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "FIRST Launching CPU task. Task ID = %d\n", current_dep_node->id);
 
       // Execute the task function
       current_dep_node->task_func(current_dep_node->arg);
@@ -290,18 +298,19 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
       if (current_dep_node->next == NULL)
       {
         free(current_dep_node);
+        last_dep = NULL;
       }
       
       tasksInQueue -= 1;
       omp_unset_lock(&queue_lock);
 
-      log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
     }
   } else {
     // Subsequent tasks depend on the previous task
     #pragma omp task untied depend(in: current_dep_node->prev->dep_var) depend(out: current_dep_node->dep_var)
     {
-      log_message(LOG_DEBUG, "Launching CPU task. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "SECOND Launching CPU task. Task ID = %d\n", current_dep_node->id);
       
       // Execute the task function
       current_dep_node->task_func(current_dep_node->arg);
@@ -320,19 +329,20 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
       // Free the current dependency node if there are no other tasks depending on it
       if (current_dep_node->next == NULL) {
         free(current_dep_node);
-        
+        last_dep = NULL;
+
         #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
         // No next task meaning queue is empty
         // Set task_available lock here, so that there wouldn't be a scenario
         // that between now and new lock set there would be a task added
-        log_message(LOG_DEBUG, "Setting task lock inisde launcher\n");
+        log_message(LOG_WARN, "Setting task lock inisde launcher\n");
         omp_set_lock(&task_available_lock); 
         #endif
       }
       tasksInQueue -= 1;
       omp_unset_lock(&queue_lock);
 
-      log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
     }
   }
 }
@@ -518,12 +528,12 @@ int main(int argc, char **argv) {
         cpu_malloc_args_t* args = malloc(sizeof(cpu_malloc_args_t));
         args->rdata = rdata;
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUMALLOCREQ\n");
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUMALLOCREQ\n");
         allocateCpuTask(cpuMallocTask, args);
         #else
         // Wait until all async tasks finish
         #pragma omp taskwait
-        log_message(LOG_DEBUG, "Executing synchronously CPU task for __cudampi__CPUMALLOCREQ\n");
+        log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUMALLOCREQ\n");
         cpuMalloc(rdata, &__cudampi__communicators[omp_get_thread_num()]);
         #endif
       }
@@ -552,12 +562,12 @@ int main(int argc, char **argv) {
         cpu_free_args_t* args = malloc(sizeof(cpu_free_args_t));
         args->devPtr = *((void **)rdata);
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUFREEREQ\n");
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUFREEREQ\n");
         allocateCpuTask(cpuFreeTask, args);
         #else
         // Wait until all async tasks finish
         #pragma omp taskwait
-        log_message(LOG_DEBUG, "Executing synchronously CPU task for __cudampi__CPUFREEREQ\n");
+        log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUFREEREQ\n");
         cpuFree(*((void **)rdata), &__cudampi__communicators[omp_get_thread_num()]);
         #endif
       }
@@ -610,7 +620,7 @@ int main(int argc, char **argv) {
         *((cudaError_t *)sdata) = error;
 
         
-        log_message(LOG_DEBUG, "Synchronized CPU device\n");
+        log_message(LOG_WARN, "Synchronized CPU device\n");
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
@@ -742,12 +752,12 @@ int main(int argc, char **argv) {
         args->buffer = rdata;
         args->count = rsize - sizeof(void *);
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
         allocateCpuTask(cpuHostToDeviceTask, args);
         #else
         // Wait until all async tasks finish
         #pragma omp taskwait
-        log_message(LOG_DEBUG, "Executing synchronously CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
+        log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
         cpuHostToDevice(*((void **)rdata), rdata + sizeof(void *), rdata, rsize - sizeof(void *), &__cudampi__communicators[omp_get_thread_num()]);
         #endif
       }
@@ -767,12 +777,12 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
         allocateCpuTask(cpuDeviceToHostTask, args);
         #else
         // Wait until all async tasks finish
         #pragma omp taskwait
-        log_message(LOG_DEBUG, "Executing synchronously CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
+        log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
         cpuDeviceToHost(*((void **)rdata), rdata, *((unsigned long *)(rdata + sizeof(void *))), &__cudampi__communicators[omp_get_thread_num()]);
         #endif
       }
@@ -794,7 +804,7 @@ int main(int argc, char **argv) {
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         if (args->devPtr != NULL && args->srcPtr != NULL && args->count > 0) {
-          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
+          log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
           allocateCpuTask(cpuHostToDeviceTaskAsync, args);
           #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
           cpuTaskLauncher();
@@ -822,7 +832,7 @@ int main(int argc, char **argv) {
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         if (args->devPtr != NULL && args->count > 0) {
-          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
+          log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
           allocateCpuTask(cpuDeviceToHostTaskAsync, args);
           #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
           cpuTaskLauncher();
@@ -859,7 +869,7 @@ int main(int argc, char **argv) {
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
         allocateCpuTask(cpuLaunchKernelTask, *((void **)rdata));
         #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
         cpuTaskLauncher();
@@ -941,23 +951,23 @@ else
     localTaskCounter = tasksInQueue;
     omp_unset_lock(&queue_lock);
 
-    log_message(LOG_DEBUG,"Tasks in queue: %d\n", localTaskCounter);
+    log_message(LOG_WARN,"Tasks in queue: %d\n", localTaskCounter);
 
     if (localTaskCounter > 0)
     {
-      log_message(LOG_DEBUG, "Waiting for task execution \n");
+      log_message(LOG_WARN, "Waiting for task execution \n");
       #pragma omp taskwait
     }
     else
     {
       
-      log_message(LOG_DEBUG, "Setting task lock \n");
+      log_message(LOG_WARN, "Setting task lock \n");
       omp_set_lock(&task_available_lock);
       // Call a function that schedules all the tasks in the queue
       cpuTaskLauncher();
     }
   }
-  log_message(LOG_DEBUG, "Terminated task handling thread!");
+  log_message(LOG_WARN, "Terminated task handling thread!");
   omp_destroy_lock(&task_available_lock);
 }
 #endif
