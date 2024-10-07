@@ -22,10 +22,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 
 void print_double_array(double* start, int batchsize) {
-    FILE *file = fopen("logs.txt", "a");
+    FILE *file = fopen("logs_gpu.txt", "a");
+    fprintf(file, "GPU\n");
      fprintf(file, "Array of size %d:\n", batchsize);
     for (int i = 0; i < batchsize; i++) {
-        fprintf(file, "%f ", start[i]);
+        fprintf(file, "%f\n", start[i]);
     }
     fclose(file);
 }
