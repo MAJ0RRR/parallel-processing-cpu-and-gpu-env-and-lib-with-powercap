@@ -20,6 +20,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "logger.h"
 #include "collatz_defines.h"
 
+
+void print_double_array(double* start, int batchsize) {
+    FILE *file = fopen("logs.txt", "a");
+     fprintf(file, "Array of size %d:\n", batchsize);
+    for (int i = 0; i < batchsize; i++) {
+        fprintf(file, "%f ", start[i]);
+    }
+    fclose(file);
+}
+
 long long VECTORSIZE = COLLATZ_VECTORSIZE;
 
 double *vectora;
@@ -182,7 +192,7 @@ int main(int argc, char **argv)
       __cudampi__cudaStreamDestroy(stream2);
     }
   }
-
+  print_double_array(vectorc, VECTORSIZE);
   gettimeofday(&stop, NULL);
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
