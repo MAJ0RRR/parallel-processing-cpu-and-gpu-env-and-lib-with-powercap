@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
-// #define EXECUTE_CPU_OPS_FULLY_ASYNC
+#define EXECUTE_CPU_OPS_FULLY_ASYNC
 #define ENABLE_LOGGING
 #include "logger.h"
 
@@ -78,6 +78,7 @@ omp_lock_t queue_lock;
 // When there are no tasks in the queue, the lock is set 
 // When new task is being added to the queue, lock is being unset
 omp_lock_t task_available_lock;
+omp_lock_t synchronize_lock; 
 #endif
 
 int tasksInQueue = 0;
@@ -202,12 +203,19 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 
 void cpuDeviceToHostTaskAsync(void* arg) {
   cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
+  cudaError_t e = cudaErrorInvalidValue;
 
   size_t ssize = sizeof(cudaError_t) + args->count;
   unsigned char sdata[ssize];
 
-  memcpy(sdata + sizeof(cudaError_t), args->devPtr, args->count);
+  if (args->devPtr != NULL && args->count > 0) {
+    memcpy(sdata + sizeof(cudaError_t), args->devPtr, args->count);
+    e = cudaSuccess;
+  }
 
+  *((cudaError_t *)sdata) = e;
+
+  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
   free(args->buffer);
   free(arg);
 }
@@ -223,6 +231,12 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
   // Execution can be done remotely by another thread signaled with task_available_lock
   // Alternatively, task_available_lock can be not used and
   // execution be started synchronously, just after calling this function
+
+  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
+  // Try setting lock if it is not set (no tasks in the queue);
+  omp_test_lock(&synchronize_lock);
+  #endif
+
   dep_node_t *new_dep = (dep_node_t *)malloc(sizeof(dep_node_t));
   if (new_dep == NULL) {
     log_message(LOG_ERROR, "Error allocating memory for dependency node.\n");
@@ -336,7 +350,9 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
         // Set task_available lock here, so that there wouldn't be a scenario
         // that between now and new lock set there would be a task added
         log_message(LOG_WARN, "Setting task lock inisde launcher\n");
-        omp_set_lock(&task_available_lock); 
+        
+        omp_unset_lock(&synchronize_lock);
+        omp_test_lock(&task_available_lock); 
         #endif
       }
       tasksInQueue -= 1;
@@ -381,6 +397,7 @@ int main(int argc, char **argv) {
 
   omp_init_lock(&queue_lock);
   #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
+  omp_init_lock(&synchronize_lock);
   omp_init_lock(&task_available_lock);
   // Set the lock since there are no tasks in queue
   omp_set_lock(&task_available_lock);
@@ -606,8 +623,15 @@ int main(int argc, char **argv) {
         size_t ssize = sizeof(cudaError_t) + sizeof(float);
         unsigned char sdata[ssize];
 
+        #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
+        // Check if there are tasks waiting to be synchronized
+        omp_set_lock(&synchronize_lock);
+        // Free the lock back
+        omp_unset_lock(&synchronize_lock);
+        #else
         // Synchronize all threads
         #pragma omp taskwait
+        #endif
 
         if (measurepower) {
           error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
@@ -817,7 +841,6 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQASYNC) {
-        cudaError_t e = cudaErrorInvalidValue;
         int rsize = sizeof(void *) + sizeof(unsigned long);
         
         // This buffer needs to be allocated dynamically, because in asynchronous execution scenario it might deallocate before task executes
@@ -831,16 +854,14 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        if (args->devPtr != NULL && args->count > 0) {
-          log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
-          allocateCpuTask(cpuDeviceToHostTaskAsync, args);
-          #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
-          cpuTaskLauncher();
-          #endif
-          e = cudaSuccess;
-        }
 
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__communicators[omp_get_thread_num()]);
+        log_message(LOG_WARN, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
+        allocateCpuTask(cpuDeviceToHostTaskAsync, args);
+        #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
+        cpuTaskLauncher();
+        // TODO: When async copy handling is implemented on host side, remove this
+        #pragma omp taskwait
+        #endif
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
