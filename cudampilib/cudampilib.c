@@ -13,8 +13,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 
 #include <omp.h>
+
+#define ENABLE_LOGGING
+#include "logger.h"
 
 #include "cudampicommon.h"
 #include "cudampilib.h"
@@ -67,6 +71,39 @@ int __cudampi__isglobalpowerlimitset = 0; // whether a global power limit has be
 float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+
+struct int_item {
+    void *dst;
+    unsigned long count;
+    int thread;
+    TAILQ_ENTRY(int_item) entries;
+};
+
+// Define the queue head
+TAILQ_HEAD(int_queue, int_item);
+
+// Declare and initialize the queue
+struct int_queue my_queue = TAILQ_HEAD_INITIALIZER(my_queue);
+
+void process_queue() {
+    struct int_item *item;
+
+    // Process all items in the queue
+    while (!TAILQ_EMPTY(&my_queue)) {
+        item = TAILQ_FIRST(&my_queue);
+        TAILQ_REMOVE(&my_queue, item, entries);
+
+        size_t rsize = sizeof(cudaError_t) + item->count;
+        unsigned char rdata[rsize];
+
+        // Receive the data
+        MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1,
+                 __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__communicators[item->thread], NULL);
+
+        // Process the received data
+        memcpy(item->dst, rdata + sizeof(cudaError_t), item->count);
+    }
+}
 
 void __cudampi__setglobalpowerlimit(float powerlimit) {
 
@@ -298,6 +335,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   int mtsprovided;
   int i;
+
+  TAILQ_INIT(&my_queue);
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
@@ -644,7 +683,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
 
-
     if (__cudampi__isCpu())
     {
       MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
@@ -658,6 +696,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
       energy = *((float *)(rdata + sizeof(cudaError_t)));
       __cudampi__inverseDeviceEnergyUsed[__cudampi__currentDevice] = 1/energy;
+      process_queue();
     }
     else
     {
@@ -895,13 +934,18 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
-    unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
+    struct int_item *item = malloc(sizeof(struct int_item));
+    if (item == NULL) {
+        log_message(LOG_ERROR, "Failed to allocate memory");
+    }
 
-    memcpy(dst, rdata + sizeof(cudaError_t), count);
+    item->dst = dst;
+    item->count = count;
+    item->thread = omp_get_thread_num();
+    TAILQ_INSERT_TAIL(&my_queue, item, entries);
 
-    return ((cudaError_t)rdata);
+    return (cudaSuccess);
   }
 }
 
