@@ -214,10 +214,9 @@ void cpuDeviceToHostTaskAsync(void* arg) {
   }
 
   *((cudaError_t *)sdata) = e;
-
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
-  free(args->buffer);
+  MPI_Bsend(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
   free(arg);
+  log_message(LOG_ERROR, "Sent the data");
 }
 
 void cpuLaunchKernelTask(void* arg) {
@@ -395,6 +394,9 @@ int main(int argc, char **argv) {
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
 
+  // TODO: change this
+  int buffer_size = 8000000;
+  void* bsend_buffer = malloc(buffer_size);
   omp_init_lock(&queue_lock);
   #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   omp_init_lock(&synchronize_lock);
@@ -407,6 +409,7 @@ int main(int argc, char **argv) {
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
+  MPI_Buffer_attach(bsend_buffer, buffer_size);
   if (mtsprovided != MPI_THREAD_MULTIPLE) {
     log_message(LOG_ERROR, "\nNo support for MPI_THREAD_MULTIPLE mode.\n");
     exit(-1);
@@ -859,8 +862,6 @@ int main(int argc, char **argv) {
         allocateCpuTask(cpuDeviceToHostTaskAsync, args);
         #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
         cpuTaskLauncher();
-        // TODO: When async copy handling is implemented on host side, remove this
-        #pragma omp taskwait
         #endif
       }
 
@@ -992,8 +993,9 @@ else
   omp_destroy_lock(&task_available_lock);
 }
 #endif
-
+}
+  MPI_Buffer_detach(&bsend_buffer, &buffer_size);
+  free(bsend_buffer);
   MPI_Finalize();
   omp_destroy_lock(&queue_lock);
-}
 }

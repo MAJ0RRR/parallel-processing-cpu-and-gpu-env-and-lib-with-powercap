@@ -193,11 +193,11 @@ int main(int argc, char **argv)
       __cudampi__cudaStreamDestroy(stream2);
     }
   }
-  print_double_array(vectorc, VECTORSIZE);
   gettimeofday(&stop, NULL);
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
+  print_double_array(vectorc, VECTORSIZE);
 
   gettimeofday(&stoptotal, NULL);
   log_message(LOG_INFO, "Total elapsed time=%f\n", (double)((stoptotal.tv_sec - starttotal.tv_sec) + (double)(stoptotal.tv_usec - starttotal.tv_usec) / 1000000.0));
