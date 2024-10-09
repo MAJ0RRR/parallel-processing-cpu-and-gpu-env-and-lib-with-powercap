@@ -30,16 +30,16 @@ int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
-typedef struct dep_node {
-    TAILQ_ENTRY(dep_node) entries; // Use sys/queue.h macros for queue entries
+typedef struct task_queue_entry {
+    TAILQ_ENTRY(task_queue_entry) entries; // Use sys/queue.h macros for queue entries
     void (*task_func)(void *);
     void *arg;
     int id;
     int dep_var;   // Dependency variable for OpenMP
     int scheduled;    // Flag to indicate if the task has been scheduled
-} dep_node_t;
+} task_queue_entry_t;
 
-TAILQ_HEAD(task_queue_head, dep_node) task_queue;
+TAILQ_HEAD(task_queue_head, task_queue_entry) task_queue;
 omp_lock_t queue_lock;
 
 #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
@@ -110,7 +110,6 @@ void cpuDeviceToHostTaskAsync(void* arg) {
   *((cudaError_t *)sdata) = e;
   MPI_Bsend(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
   free(arg);
-  log_message(LOG_ERROR, "Sent the data");
 }
 
 void cpuLaunchKernelTask(void* arg) {
@@ -130,7 +129,7 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
   omp_test_lock(&synchronize_lock);
   #endif
 
-  dep_node_t *new_dep = (dep_node_t *)malloc(sizeof(dep_node_t));
+  task_queue_entry_t *new_dep = (task_queue_entry_t *)malloc(sizeof(task_queue_entry_t));
   if (new_dep == NULL) {
     log_message(LOG_ERROR, "Error allocating memory for dependency node.\n");
     return;
@@ -159,9 +158,9 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
   log_message(LOG_WARN, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
 }
 
-void scheduleCpuTask(dep_node_t* current_dep_node)
+void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
 {
-  // This function exists, so that independent copy of current_dep_node would be created.
+  // This function exists, so that independent copy of current_task_queue_entry would be created.
   // Caller of this function moves head pointer of the list by one, but does not remove the node,
   // so there can be a situation that list will be empty (head == tail == NULL),
   // but there will be multiple existing nodes waiting for execution.
@@ -169,43 +168,42 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
   // so actual memory management (freeing not used nodes, setting pointer to NULL) is done
   // inside tasks started in this function, meaning each task frees it's previous node.
 
-  dep_node_t* prev_node;
+  task_queue_entry_t* prev_node;
 
-  omp_set_lock(&queue_lock);
-  prev_node = TAILQ_PREV(current_dep_node, task_queue_head, entries);
-  current_dep_node->scheduled = 1;
+  // IMPORTANT: The assumption here is that queue lock is already set when this is called 
+  prev_node = TAILQ_PREV(current_task_queue_entry, task_queue_head, entries);
+  current_task_queue_entry->scheduled = 1;
   scheduledTasksInQueue += 1;
-  omp_unset_lock(&queue_lock);
 
   if (prev_node == NULL)
   {
     // First task has no 'in' dependency
-    #pragma omp task untied depend(out: current_dep_node->dep_var)
+    #pragma omp task untied depend(out: current_task_queue_entry->dep_var)
     {
-      log_message(LOG_WARN, "FIRST Launching CPU task. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "FIRST Launching CPU task. Task ID = %d\n", current_task_queue_entry->id);
 
       // Execute the task function
-      current_dep_node->task_func(current_dep_node->arg);
+      current_task_queue_entry->task_func(current_task_queue_entry->arg);
 
       omp_set_lock(&queue_lock);
 
       // Free the current dependency node if there are no other tasks depending on it
-      if (TAILQ_NEXT(current_dep_node, task_queue_head, entries) == NULL){
-        TAILQ_REMOVE(&task_queue, current_dep_node, entries);
+      if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
+        TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
       }
       scheduledTasksInQueue -= 1;
       omp_unset_lock(&queue_lock);
 
-      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_task_queue_entry->id);
     }
   } else {
     // Subsequent tasks depend on the previous task
-    #pragma omp task untied depend(in: prev_node->dep_var) depend(out: current_dep_node->dep_var)
+    #pragma omp task untied depend(in: prev_node->dep_var) depend(out: current_task_queue_entry->dep_var)
     {
-      log_message(LOG_WARN, "SECOND Launching CPU task. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "SECOND Launching CPU task. Task ID = %d\n", current_task_queue_entry->id);
 
       // Execute the task function
-      current_dep_node->task_func(current_dep_node->arg);
+      current_task_queue_entry->task_func(current_task_queue_entry->arg);
 
       omp_set_lock(&queue_lock);
 
@@ -213,8 +211,8 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
       TAILQ_REMOVE(&task_queue, prev_node, entries);
 
       // Free the current dependency node if there are no other tasks depending on it
-      if (TAILQ_NEXT(current_dep_node, task_queue_head, entries) == NULL){
-        TAILQ_REMOVE(&task_queue, current_dep_node, entries);
+      if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
+        TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
 
         #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
         // No next task meaning queue is empty
@@ -230,7 +228,7 @@ void scheduleCpuTask(dep_node_t* current_dep_node)
       scheduledTasksInQueue -= 1;
       omp_unset_lock(&queue_lock);
 
-      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_dep_node->id);
+      log_message(LOG_WARN, "Finished CPU task execution. Task ID = %d\n", current_task_queue_entry->id);
     }
   }
 }
@@ -240,14 +238,14 @@ void cpuTaskLauncher()
   // The assumption here is that there is only one thread executing this code.
   // This loop processes the entire FIFO by scheduling taks and exits.
 
-  dep_node_t *current_dep_node;
+  task_queue_entry_t *current_task_queue_entry;
 
   omp_set_lock(&queue_lock);
 
   // Iterate over the queue and schedule unscheduled tasks
-  TAILQ_FOREACH_SAFE(task_queue_head, &task_queue, entries, current_dep_node) {
-      if (current_dep_node->scheduled == 0) {
-          scheduleCpuTask(current_dep_node);
+  TAILQ_FOREACH(current_task_queue_entry, &task_queue, entries) {
+      if (current_task_queue_entry->scheduled == 0) {
+          scheduleCpuTask(current_task_queue_entry);
       }
   }
   omp_unset_lock(&queue_lock);
@@ -426,7 +424,7 @@ int main(int argc, char **argv) {
         cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
         *((cudaError_t *)(sdata + sizeof(void *))) = e;
 
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
@@ -461,7 +459,7 @@ int main(int argc, char **argv) {
           e = cudaSuccess;
         }
 
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
@@ -708,6 +706,7 @@ int main(int argc, char **argv) {
           e = cudaSuccess;
         }
 
+          log_message(LOG_WARN, "Sending CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
         MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESPASYNC, __cudampi__communicators[omp_get_thread_num()]);
 
       }
