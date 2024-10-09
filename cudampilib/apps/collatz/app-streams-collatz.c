@@ -20,16 +20,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "logger.h"
 #include "collatz_defines.h"
 
-
-void print_double_array(double* start, int batchsize) {
-    FILE *file = fopen("logs_cpugpuasyncfull.txt", "a");
-    fprintf(file, "CPUGPUASYNCFULL\n");
+void print_double_array(double* start, int batchsize, const char* filename, const char* header) {
+    FILE *file = fopen(filename, "w");
+    fprintf(file, "%s\n", header);
      fprintf(file, "Array of size %d:\n", batchsize);
     for (int i = 0; i < batchsize; i++) {
         fprintf(file, "%f\n", start[i]);
     }
     fclose(file);
 }
+
 
 long long VECTORSIZE = COLLATZ_VECTORSIZE;
 
@@ -197,7 +197,7 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
-  print_double_array(vectorc, VECTORSIZE);
+  print_double_array(vectorc, VECTORSIZE, "logs_cpugpuasyncfull.txt", "CPUGPUASYNC");
 
   gettimeofday(&stoptotal, NULL);
   log_message(LOG_INFO, "Total elapsed time=%f\n", (double)((stoptotal.tv_sec - starttotal.tv_sec) + (double)(stoptotal.tv_usec - starttotal.tv_usec) / 1000000.0));
