@@ -85,62 +85,6 @@ void cpuSynchronize()
   #pragma omp taskwait
   #endif
 }
-void cpuMalloc(unsigned long rdata)
-{
-  void *devPtr = malloc((size_t)rdata);
-
-  int ssize = sizeof(void *) + sizeof(cudaError_t);
-  // send confirmation with the actual pointer
-  unsigned char sdata[ssize];
-
-  *((void **)sdata) = devPtr;
-
-  // return cudaSuccess if memory is not NULL, cudaErrorMemoryAllocation otherwise
-  cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
-  *((cudaError_t *)(sdata + sizeof(void *))) = e;
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
-}
-
-void cpuFree(void *devPtr) {
-  cudaError_t e = cudaErrorInvalidDevicePointer;
-
-  if (devPtr != NULL) {
-    free(devPtr);
-    e = cudaSuccess;
-  }
-
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
-}
-
-void cpuHostToDevice(void *devPtr, void *srcPtr, unsigned char* buffer, size_t count) {
-  cudaError_t e = cudaErrorInvalidValue;
-
-  if (devPtr != NULL && srcPtr != NULL && count > 0) {
-    memcpy(devPtr, srcPtr, count);
-    e = cudaSuccess;
-  }
-
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
-  free(buffer);
-}
-
-void cpuDeviceToHost(void *devPtr, unsigned char* buffer, unsigned long count) {
-  cudaError_t e = cudaErrorInvalidValue;
-
-  size_t ssize = sizeof(cudaError_t) + count;
-  unsigned char sdata[ssize];
-
-  if (devPtr != NULL && count > 0) {
-    memcpy(sdata + sizeof(cudaError_t), devPtr, count);
-    e = cudaSuccess;
-  }
-
-  *((cudaError_t *)sdata) = e;
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__communicators[omp_get_thread_num()]);
-  free(buffer);
-}
-
-
 
 void cpuHostToDeviceTaskAsync(void* arg) {
   cpu_host_to_device_args_t *args = (cpu_host_to_device_args_t*) arg;
@@ -469,7 +413,20 @@ int main(int argc, char **argv) {
 
         cpuSynchronize();
         log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUMALLOCREQ\n");
-        cpuMalloc(rdata);
+
+        void *devPtr = malloc((size_t)rdata);
+
+        int ssize = sizeof(void *) + sizeof(cudaError_t);
+        // send confirmation with the actual pointer
+        unsigned char sdata[ssize];
+
+        *((void **)sdata) = devPtr;
+
+        // return cudaSuccess if memory is not NULL, cudaErrorMemoryAllocation otherwise
+        cudaError_t e = (devPtr == NULL) ? cudaErrorMemoryAllocation : cudaSuccess;
+        *((cudaError_t *)(sdata + sizeof(void *))) = e;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUMALLOCRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
@@ -494,7 +451,17 @@ int main(int argc, char **argv) {
 
         cpuSynchronize();
         log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUFREEREQ\n");
-        cpuFree(*((void **)rdata));
+
+        void *devPtr = *((void **)rdata);
+        cudaError_t e = cudaErrorInvalidDevicePointer;
+
+        // maybe we should somehow handle invalid devPtr ?
+        if (devPtr != NULL) {
+          free(devPtr);
+          e = cudaSuccess;
+        }
+
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cpumpi__CPUFREERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
@@ -670,7 +637,20 @@ int main(int argc, char **argv) {
 
         cpuSynchronize();
         log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUHOSTTODEVICEREQ\n");
-        cpuHostToDevice(*((void **)rdata), rdata + sizeof(void *), rdata, rsize - sizeof(void *));
+
+        void *devPtr = *((void **)rdata);
+        void *srcPtr = rdata + sizeof(void *);
+        size_t count = rsize - sizeof(void *);
+
+        cudaError_t e = cudaErrorInvalidValue;
+
+        if (devPtr != NULL && srcPtr != NULL && count > 0)
+        {
+          memcpy(devPtr, srcPtr, rsize - sizeof(void *));
+          e = cudaSuccess; 
+        }
+
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQ) {
@@ -683,7 +663,24 @@ int main(int argc, char **argv) {
 
         cpuSynchronize();
         log_message(LOG_WARN, "Executing synchronously CPU task for __cudampi__CPUDEVICETOHOSTREQ\n");
-        cpuDeviceToHost(*((void **)rdata), rdata, *((unsigned long *)(rdata + sizeof(void *))));
+
+        void *devPtr = *((void **)rdata);
+        unsigned long count = *((unsigned long *)(rdata + sizeof(void *)));
+
+        cudaError_t e = cudaErrorInvalidValue;
+
+        size_t ssize = sizeof(cudaError_t) + count;
+        unsigned char sdata[ssize];
+
+        if (devPtr != NULL && count > 0)
+        {
+          memcpy(sdata + sizeof(cudaError_t), devPtr, count);
+          e = cudaSuccess; 
+        }
+
+        *((cudaError_t *)sdata) = e;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQASYNC) {
