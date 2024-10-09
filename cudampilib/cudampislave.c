@@ -55,16 +55,6 @@ void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
 
-typedef struct cpu_malloc_args {
-  unsigned long rdata;
-  MPI_Comm* comm;
-} cpu_malloc_args_t;
-
-typedef struct cpu_free_args {
-  void *devPtr;
-  MPI_Comm* comm;
-} cpu_free_args_t;
-
 typedef struct cpu_host_to_device_args {
   void *devPtr;
   void *srcPtr;
