@@ -72,26 +72,26 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
-struct int_item {
+typedef struct memcpy_queue_entry {
     void *dst;
     unsigned long count;
     int thread;
-    TAILQ_ENTRY(int_item) entries;
-};
+    TAILQ_ENTRY(memcpy_queue_entry) entries;
+} memcpy_queue_entry_t;
 
 // Define the queue head
-TAILQ_HEAD(int_queue, int_item);
+TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
 
 // Declare and initialize the queue
-struct int_queue my_queue = TAILQ_HEAD_INITIALIZER(my_queue);
+struct memcpy_queue_head memcpy_queue;
 
 void process_queue() {
-    struct int_item *item;
+    memcpy_queue_entry_t* item;
 
     // Process all items in the queue
-    while (!TAILQ_EMPTY(&my_queue)) {
-        item = TAILQ_FIRST(&my_queue);
-        TAILQ_REMOVE(&my_queue, item, entries);
+    while (!TAILQ_EMPTY(&memcpy_queue)) {
+        item = TAILQ_FIRST(&memcpy_queue);
+        TAILQ_REMOVE(&memcpy_queue, item, entries);
 
         size_t rsize = sizeof(cudaError_t) + item->count;
         unsigned char rdata[rsize];
@@ -336,7 +336,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   int mtsprovided;
   int i;
 
-  TAILQ_INIT(&my_queue);
+  TAILQ_INIT(&memcpy_queue);
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
@@ -935,7 +935,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
 
     size_t rsize = sizeof(cudaError_t) + count;
 
-    struct int_item *item = malloc(sizeof(struct int_item));
+    memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
     if (item == NULL) {
         log_message(LOG_ERROR, "Failed to allocate memory");
     }
@@ -943,7 +943,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     item->dst = dst;
     item->count = count;
     item->thread = omp_get_thread_num();
-    TAILQ_INSERT_TAIL(&my_queue, item, entries);
+    TAILQ_INSERT_TAIL(&memcpy_queue, item, entries);
 
     return (cudaSuccess);
   }
