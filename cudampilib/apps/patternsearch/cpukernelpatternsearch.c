@@ -27,27 +27,25 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
   char *devPtrc = (char *)(((void **)devPtr)[1]);
 
   #pragma omp parallel for num_threads(num_threads)
+  for (long my_index = 0; my_index < num_elements; my_index++)
   {
-    for (long my_index = 0; my_index < num_elements; my_index++)
-    {
-        int i, j;
-        char ok;
+      int i, j;
+      char ok;
 
-        devPtrc[my_index] = 0;
+      devPtrc[my_index] = 0;
 
-        for (i = 0; i < PATTERNCOUNT; i++) 
-        {
-            ok = 1;
-            for (j = 0; j < PATTERNLENGTH; j++) 
-            {
-                if (devPtra[my_index + j] != pattern[i][j])
-                {
-                    ok = 0;
-                }
-            }
-            devPtrc[my_index] += ok;
-        }
-    }
+      for (i = 0; i < PATTERNCOUNT; i++) 
+      {
+          ok = 1;
+          for (j = 0; j < PATTERNLENGTH; j++) 
+          {
+              if (devPtra[my_index + j] != pattern[i][j])
+              {
+                  ok = 0;
+              }
+          }
+          devPtrc[my_index] += ok;
+      }
   }
 }
 
