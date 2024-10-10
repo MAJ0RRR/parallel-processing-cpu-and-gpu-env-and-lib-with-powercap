@@ -75,7 +75,6 @@ int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 typedef struct memcpy_queue_entry {
     void *dst;
     unsigned long count;
-    int thread;
     unsigned char* buffer;
     MPI_Request request;
     TAILQ_ENTRY(memcpy_queue_entry) entries;
@@ -99,12 +98,11 @@ void initiateAsyncRecv(void* dst, unsigned long count)
 
   // Initiate non-blocking receive
   MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1,
-            __cudampi__DEVICETOHOSTDATA, __cudampi__communicators[item->thread], &item->request);
+            __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
 
   item->buffer = rdata;
   item->dst = dst;
   item->count = count;
-  item->thread = omp_get_thread_num();
   TAILQ_INSERT_TAIL(&memcpy_queue, item, entries);
 }
 
@@ -952,13 +950,16 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
 
+
+    initiateAsyncRecv(dst, count);
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__currentCommunicator);
 
     cudaError_t rdata;
 
-    MPI_Recv(&rdata, sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICERESPASYNC, __cudampi__currentCommunicator, NULL);
+  log_message(LOG_WARN, "Sent");
+    MPI_Recv((unsigned char *)(&rdata), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
 
-    initiateAsyncRecv(dst, count);
+  log_message(LOG_WARN, "Done");
 
     return (rdata);
   }
