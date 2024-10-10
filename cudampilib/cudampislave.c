@@ -105,15 +105,10 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 
 void cpuDeviceToHostTaskAsync(void* arg) {
   cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
-
-  size_t ssize = sizeof(cudaError_t) + args->count;
-  unsigned char sdata[ssize];
-
-  memcpy(sdata + sizeof(cudaError_t), args->devPtr, args->count);
-
-  *((cudaError_t *)sdata) = e;
   // Send data synchronously and receive asynchronously in master
-  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
+  log_message(LOG_ERROR, "Waiting to send %d", args->count);
+  MPI_Send(args->devPtr, args->count, MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
+  log_message(LOG_DEBUG, "Waited to send");
   free(arg);
 }
 
@@ -737,9 +732,9 @@ int main(int argc, char **argv) {
           cpuTaskLauncher();
           #endif
         }
-        
+
         // Send data synchronously and receive asynchronously in master
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
