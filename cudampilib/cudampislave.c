@@ -105,18 +105,15 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 
 void cpuDeviceToHostTaskAsync(void* arg) {
   cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
-  cudaError_t e = cudaErrorInvalidValue;
 
   size_t ssize = sizeof(cudaError_t) + args->count;
   unsigned char sdata[ssize];
 
-  if (args->devPtr != NULL && args->count > 0) {
-    memcpy(sdata + sizeof(cudaError_t), args->devPtr, args->count);
-    e = cudaSuccess;
-  }
+  memcpy(sdata + sizeof(cudaError_t), args->devPtr, args->count);
 
   *((cudaError_t *)sdata) = e;
-  MPI_Bsend(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
+  // Send data synchronously and receive asynchronously in master
+  MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
   free(arg);
 }
 
@@ -264,9 +261,6 @@ int main(int argc, char **argv) {
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
 
-  // TODO: change this
-  int buffer_size = 8000000;
-  void* bsend_buffer = malloc(buffer_size);
   omp_init_lock(&queue_lock);
   #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   omp_init_lock(&synchronize_lock);
@@ -282,7 +276,6 @@ int main(int argc, char **argv) {
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
-  MPI_Buffer_attach(bsend_buffer, buffer_size);
   if (mtsprovided != MPI_THREAD_MULTIPLE) {
     log_message(LOG_ERROR, "\nNo support for MPI_THREAD_MULTIPLE mode.\n");
     exit(-1);
@@ -721,6 +714,7 @@ int main(int argc, char **argv) {
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQASYNC) {
         int rsize = sizeof(void *) + sizeof(unsigned long);
+        cudaError_t e = cudaErrorInvalidValue;
         
         // This buffer needs to be allocated dynamically, because in asynchronous execution scenario it might deallocate before task executes
         unsigned char* rdata = malloc(sizeof(unsigned char) * rsize);
@@ -733,12 +727,19 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
-        allocateCpuTask(cpuDeviceToHostTaskAsync, args);
-        #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
-        cpuTaskLauncher();
-        #endif
+        if (args->devPtr != NULL && args->count > 0)
+        {
+          e = cudaSuccess;
+          
+          log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
+          allocateCpuTask(cpuDeviceToHostTaskAsync, args);
+          #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
+          cpuTaskLauncher();
+          #endif
+        }
+        
+        // Send data synchronously and receive asynchronously in master
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTRESPASYNC, *(args->comm));
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
@@ -871,8 +872,6 @@ else
 }
 #endif
 }
-  MPI_Buffer_detach(&bsend_buffer, &buffer_size);
-  free(bsend_buffer);
   MPI_Finalize();
   omp_destroy_lock(&queue_lock);
 }
