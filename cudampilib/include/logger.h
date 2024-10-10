@@ -39,6 +39,7 @@ static const char* LOG_LEVEL_NAMES[] = {
             va_end(args);
             
             fprintf(stderr, "\n");
+            fflush(stderr);
         }
     }
 #else
