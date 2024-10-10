@@ -76,6 +76,8 @@ typedef struct memcpy_queue_entry {
     void *dst;
     unsigned long count;
     int thread;
+    unsigned char* buffer;
+    MPI_Request request;
     TAILQ_ENTRY(memcpy_queue_entry) entries;
 } memcpy_queue_entry_t;
 
@@ -85,23 +87,42 @@ TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
 // Declare and initialize the queue
 struct memcpy_queue_head memcpy_queue;
 
+
+void initiateAsyncRecv(void* dst, unsigned long count)
+{ 
+  memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
+  if (item == NULL) {
+      log_message(LOG_ERROR, "Failed to allocate memory");
+  }
+ 
+  unsigned char* rdata = malloc(count * sizeof(unsigned char));  // Allocate memory dynamically for rdata
+
+  // Initiate non-blocking receive
+  MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1,
+            __cudampi__DEVICETOHOSTDATA, __cudampi__communicators[item->thread], &item->request);
+
+  item->buffer = rdata;
+  item->dst = dst;
+  item->count = count;
+  item->thread = omp_get_thread_num();
+  TAILQ_INSERT_TAIL(&memcpy_queue, item, entries);
+}
+
 void process_queue() {
     memcpy_queue_entry_t* item;
+    MPI_Status status;
 
     // Process all items in the queue
     while (!TAILQ_EMPTY(&memcpy_queue)) {
         item = TAILQ_FIRST(&memcpy_queue);
         TAILQ_REMOVE(&memcpy_queue, item, entries);
 
-        size_t rsize = sizeof(cudaError_t) + item->count;
-        unsigned char rdata[rsize];
-
-        // Receive the data
-        MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1,
-                 __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__communicators[item->thread], NULL);
+        // Wait for the request to be received
+        MPI_Wait(&item->request, &status);
 
         // Process the received data
-        memcpy(item->dst, rdata + sizeof(cudaError_t), item->count);
+        memcpy(item->dst, item->buffer + sizeof(cudaError_t), item->count);
+        free(item->buffer);
     }
 }
 
@@ -933,19 +954,13 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__currentCommunicator);
 
-    size_t rsize = sizeof(cudaError_t) + count;
+    cudaError_t rdata;
 
-    memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
-    if (item == NULL) {
-        log_message(LOG_ERROR, "Failed to allocate memory");
-    }
+    MPI_Recv(&rdata, sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICERESPASYNC, __cudampi__currentCommunicator, NULL);
 
-    item->dst = dst;
-    item->count = count;
-    item->thread = omp_get_thread_num();
-    TAILQ_INSERT_TAIL(&memcpy_queue, item, entries);
+    initiateAsyncRecv(dst, count);
 
-    return (cudaSuccess);
+    return (rdata);
   }
 }
 
