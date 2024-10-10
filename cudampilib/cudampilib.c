@@ -96,9 +96,7 @@ void initiateAsyncRecv(void* dst, unsigned long count)
  
   unsigned char* rdata = malloc(count * sizeof(unsigned char));  // Allocate memory dynamically for rdata
 
-  // Initiate non-blocking receive
-  MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1,
-            __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
+  MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
 
   item->buffer = rdata;
   item->dst = dst;
@@ -109,7 +107,6 @@ void initiateAsyncRecv(void* dst, unsigned long count)
 void process_queue() {
     memcpy_queue_entry_t* item;
     MPI_Status status;
-
     // Process all items in the queue
     while (!TAILQ_EMPTY(&memcpy_queue)) {
         item = TAILQ_FIRST(&memcpy_queue);
@@ -633,7 +630,7 @@ cudaError_t __cudampi__cpuFree(void *devPtr) {
   int rsize = sizeof(cudaError_t);
   unsigned char rdata[rsize];
 
-  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUFREERESP, __cudampi__currentCommunicator, MPI_STATUS_IGNORE);
+  MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUFREERESP, __cudampi__currentCommunicator, NULL);
 
   return *((cudaError_t *)rdata);
 }
@@ -954,14 +951,12 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     initiateAsyncRecv(dst, count);
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__currentCommunicator);
 
-    cudaError_t rdata;
+    int rsize = sizeof(cudaError_t);
+    unsigned char rdata[rsize];
 
-  log_message(LOG_WARN, "Sent");
-    MPI_Recv((unsigned char *)(&rdata), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
+    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
 
-  log_message(LOG_WARN, "Done");
-
-    return (rdata);
+    return ((cudaError_t)rdata);
   }
 }
 
