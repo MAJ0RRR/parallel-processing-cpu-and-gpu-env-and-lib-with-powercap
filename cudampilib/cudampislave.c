@@ -49,16 +49,16 @@ typedef struct task_queue_entry {
     int scheduled;    // Flag to indicate if the task has been scheduled
 } task_queue_entry_t;
 
-TAILQ_HEAD(task_queue_head, task_queue_entry) task_queue;
-omp_lock_t queue_lock;
+TAILQ_HEAD(task_queue_head, task_queue_entry) task_queues[CPU_STREAMS_SUPPORTED];
+omp_lock_t queue_locks[CPU_STREAMS_SUPPORTED];
 
 // CPU task launcher thread will wait on this lock until there are tasks available
 // When there are no tasks in the queue, the lock is set
 // When new task is being added to the queue, lock is being unset
-omp_lock_t task_available_lock;
-omp_lock_t synchronize_lock;
+omp_lock_t task_available_locks[CPU_STREAMS_SUPPORTED];
+omp_lock_t synchronize_locks[CPU_STREAMS_SUPPORTED];
 
-int scheduledTasksInQueue = 0;
+int scheduledTasksInStream[CPU_STREAMS_SUPPORTED];
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
@@ -79,9 +79,12 @@ void cpuSynchronize()
 {
   log_message(LOG_DEBUG, "Synchronizing CPU tasks");
   // Check if there are tasks waiting to be synchronized
-  omp_set_lock(&synchronize_lock);
-  // Free the lock back
-  omp_unset_lock(&synchronize_lock);
+  for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
+  {
+    omp_set_lock(&synchronize_locks[i]);
+    // Free the lock back
+    omp_unset_lock(&synchronize_locks[i]);
+  }
 }
 
 void cpuHostToDeviceTaskAsync(void* arg) {
@@ -121,9 +124,12 @@ void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long
 {
   // This function takes a function pointer and argument and adds task to execute it to the list
   // Execution can be done remotely by another thread signaled with task_available_lock
-
+  if (stream >= CPU_STREAMS_SUPPORTED) {
+    log_message(LOG_ERROR, "Trying to allocate task in invalid stream");
+    return;
+  }
   // Try setting lock if it is not set (no tasks in the queue);
-  omp_test_lock(&synchronize_lock);
+  omp_test_lock(&synchronize_locks[stream]);
 
   task_queue_entry_t *new_dep = (task_queue_entry_t *)malloc(sizeof(task_queue_entry_t));
   if (new_dep == NULL) {
@@ -137,21 +143,21 @@ void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long
   new_dep->scheduled = 0;   // Task is not scheduled yet
 
   // Lock to safely update the dependency chain
-  omp_set_lock(&queue_lock);
+  omp_set_lock(&queue_locks[stream]);
 
-  TAILQ_INSERT_TAIL(&task_queue, new_dep, entries);
+  TAILQ_INSERT_TAIL(&task_queues[stream], new_dep, entries);
 
   // Signal the task_launcher that a task is available
   // Unlock task_available_lock to allow task_launcher to proceed
   log_message(LOG_DEBUG, "Unsetting task lock\n");
-  omp_unset_lock(&task_available_lock);
+  omp_unset_lock(&task_available_locks[stream]);
 
-  omp_unset_lock(&queue_lock);
+  omp_unset_lock(&queue_locks[stream]);
 
   log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
 }
 
-void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
+void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry, unsigned long stream)
 {
   // This function exists, so that independent copy of current_task_queue_entry would be created.
   // Caller of this function moves head pointer of the list by one, but does not remove the node,
@@ -166,7 +172,7 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
   // IMPORTANT: The assumption here is that queue lock is already set when this is called 
   prev_node = TAILQ_PREV(current_task_queue_entry, task_queue_head, entries);
   current_task_queue_entry->scheduled = 1;
-  scheduledTasksInQueue += 1;
+  scheduledTasksInStream[stream] += 1;
 
   if (prev_node == NULL)
   {
@@ -178,22 +184,22 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
       // Execute the task function
       current_task_queue_entry->task_func(current_task_queue_entry->arg);
 
-      omp_set_lock(&queue_lock);
+      omp_set_lock(&queue_locks[stream]);
 
       // Free the current dependency node if there are no other tasks depending on it
       if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
-        TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
+        TAILQ_REMOVE(&task_queues[stream], current_task_queue_entry, entries);
         
         // No next task meaning queue is empty
         // Set task_available lock here, so that there wouldn't be a scenario
         // that between now and new lock set there would be a task added
         log_message(LOG_DEBUG, "Unsetting task lock inisde launcher\n");
         
-        omp_unset_lock(&synchronize_lock);
-        omp_test_lock(&task_available_lock); 
+        omp_unset_lock(&synchronize_locks[stream]);
+        omp_test_lock(&task_available_locks[stream]); 
       }
-      scheduledTasksInQueue -= 1;
-      omp_unset_lock(&queue_lock);
+      scheduledTasksInStream[stream] -= 1;
+      omp_unset_lock(&queue_locks[stream]);
 
       log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d\n", current_task_queue_entry->id);
     }
@@ -206,63 +212,66 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
       // Execute the task function
       current_task_queue_entry->task_func(current_task_queue_entry->arg);
 
-      omp_set_lock(&queue_lock);
+      omp_set_lock(&queue_locks[stream]);
 
       //Free the previous dependency node if it hasn't been freed
-      TAILQ_REMOVE(&task_queue, prev_node, entries);
+      TAILQ_REMOVE(&task_queues[stream], prev_node, entries);
 
       // Free the current dependency node if there are no other tasks depending on it
       if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
-        TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
+        TAILQ_REMOVE(&task_queues[stream], current_task_queue_entry, entries);
 
         // No next task meaning queue is empty
         // Set task_available lock here, so that there wouldn't be a scenario
         // that between now and new lock set there would be a task added
         log_message(LOG_DEBUG, "Unsetting task lock inisde launcher\n");
         
-        omp_unset_lock(&synchronize_lock);
-        omp_test_lock(&task_available_lock); 
+        omp_unset_lock(&synchronize_locks[stream]);
+        omp_test_lock(&task_available_locks[stream]); 
       }
 
-      scheduledTasksInQueue -= 1;
-      omp_unset_lock(&queue_lock);
+      scheduledTasksInStream[stream] -= 1;
+      omp_unset_lock(&queue_locks[stream]);
 
       log_message(LOG_DEBUG, "Finished CPU task execution. Task ID = %d\n", current_task_queue_entry->id);
     }
   }
 }
 
-void cpuTaskLauncher()
+void cpuTaskLauncher(unsigned long stream)
 {
   // The assumption here is that there is only one thread executing this code.
   // This loop processes the entire FIFO by scheduling taks and exits.
 
   task_queue_entry_t *current_task_queue_entry;
 
-  omp_set_lock(&queue_lock);
+  omp_set_lock(&queue_locks[stream]);
 
   // Iterate over the queue and schedule unscheduled tasks
-  TAILQ_FOREACH(current_task_queue_entry, &task_queue, entries) {
+  TAILQ_FOREACH(current_task_queue_entry, &task_queues[stream], entries) {
       if (current_task_queue_entry->scheduled == 0) {
-          scheduleCpuTask(current_task_queue_entry);
+          scheduleCpuTask(current_task_queue_entry, stream);
       }
   }
-  omp_unset_lock(&queue_lock);
+  omp_unset_lock(&queue_locks[stream]);
 }
 
 int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
+  for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
+  {
+    
+    scheduledTasksInStream[i] = 0;
+    omp_init_lock(&queue_locks[i]);
+    omp_init_lock(&synchronize_locks[i]);
+    omp_init_lock(&task_available_locks[i]);
+    // Set the lock since there are no tasks in queue
+    omp_set_lock(&task_available_locks[i]);
+    TAILQ_INIT(&task_queues[i]);
+  }
 
-  omp_init_lock(&queue_lock);
-  omp_init_lock(&synchronize_lock);
-  omp_init_lock(&task_available_lock);
-  // Set the lock since there are no tasks in queue
-  omp_set_lock(&task_available_lock);
-
-  // Initialize the queue
-  TAILQ_INIT(&task_queue);
 
   int mtsprovided;
 
@@ -356,7 +365,10 @@ int main(int argc, char **argv) {
   int numberOfThreads = deviceThreads;
   
   // Add one thread for executing CPU operations asynchronously
-  numberOfThreads += 1;
+  if (CPU_STREAMS_SUPPORTED < 1 || CPU_STREAMS_SUPPORTED > 2) {
+    log_message(LOG_ERROR, "It is only possible to launch 1 or 2 CPU streams. Currently attempted: %d", CPU_STREAMS_SUPPORTED);
+  }
+  numberOfThreads += CPU_STREAMS_SUPPORTED;
 
   #pragma omp parallel num_threads(numberOfThreads)
   {
@@ -683,7 +695,7 @@ int main(int argc, char **argv) {
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC in stream %d\n", stream);
         allocateCpuTaskInStream(cpuHostToDeviceTaskAsync, args, stream);
       }
 
@@ -699,7 +711,7 @@ int main(int argc, char **argv) {
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
         unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC in stream %d\n", stream);
         allocateCpuTaskInStream(cpuDeviceToHostTaskAsync, args, stream);
       }
 
@@ -730,7 +742,7 @@ int main(int argc, char **argv) {
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
         unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) ));
-        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
+        log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ in stream %d\n", stream);
         allocateCpuTaskInStream(cpuLaunchKernelTask, *((void **)rdata), stream);
         
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
@@ -841,17 +853,22 @@ int main(int argc, char **argv) {
 
     } while (status.MPI_TAG != __cudampi__CUDAMPIFINALIZE);
     terminated = 1;
-    omp_unset_lock(&task_available_lock);
+    
+    for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++) {
+      omp_unset_lock(&task_available_locks[i]);
+    }
   }
 else
 {
-  int localTaskCounter = 0 ;
+  int localTaskCounter = 0;
+  int stream = omp_get_thread_num() - deviceThreads;
+
   while(!terminated)
   {
     // If there's data in task queue, wait for completion
-    omp_set_lock(&queue_lock);
-    localTaskCounter = scheduledTasksInQueue;
-    omp_unset_lock(&queue_lock);
+    omp_set_lock(&queue_locks[stream]);
+    localTaskCounter = scheduledTasksInStream[stream];
+    omp_unset_lock(&queue_locks[stream]);
 
     log_message(LOG_DEBUG,"Tasks in queue: %d\n", localTaskCounter);
 
@@ -865,15 +882,21 @@ else
       
       log_message(LOG_DEBUG, "Setting task lock \n");
       // Wait for new tasks to be allocated
-      omp_set_lock(&task_available_lock);
+      omp_set_lock(&task_available_locks[stream]);
       // Call a function that schedules all the tasks in the queue
-      cpuTaskLauncher();
+      cpuTaskLauncher(stream);
     }
   }
   log_message(LOG_DEBUG, "Terminated task handling thread!");
-  omp_destroy_lock(&task_available_lock);
+  omp_destroy_lock(&task_available_locks[stream]);
 }
 }
   MPI_Finalize();
-  omp_destroy_lock(&queue_lock);
+  
+  for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
+  {
+    omp_destroy_lock(&queue_locks[i]);
+    omp_destroy_lock(&synchronize_locks[i]);
+    omp_destroy_lock(&task_available_locks[i]);
+  }
 }
