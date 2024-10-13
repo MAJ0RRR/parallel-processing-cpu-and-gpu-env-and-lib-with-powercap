@@ -116,7 +116,7 @@ void process_queue() {
         MPI_Wait(&item->request, &status);
 
         // Process the received data
-        memcpy(item->dst, item->buffer + sizeof(cudaError_t), item->count);
+        memcpy(item->dst, item->buffer, item->count);
         free(item->buffer);
     }
 }
@@ -954,9 +954,9 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     int rsize = sizeof(cudaError_t);
     unsigned char rdata[rsize];
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
+   MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
 
-    return ((cudaError_t)rdata);
+   return ((cudaError_t)rdata);
   }
 }
 

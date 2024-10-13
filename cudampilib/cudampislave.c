@@ -106,11 +106,10 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 void cpuDeviceToHostTaskAsync(void* arg) {
   cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
   // Send data synchronously and receive asynchronously in master
-  log_message(LOG_ERROR, "Waiting to send %d", args->count);
+  log_message(LOG_DEBUG, "Waiting to send %d", args->count);
 
-  int x = MPI_Send((unsigned char*)(args->devPtr), /*args->count*/ 1, MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
+  MPI_Send((unsigned char*)(args->devPtr), args->count , MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
 
-  log_message(LOG_ERROR, "Waited to send, %d", x);
   free(arg);
 }
 
