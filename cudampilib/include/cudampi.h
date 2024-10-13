@@ -56,5 +56,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__CUDAMPIFINALIZE 100
 #define MIN_ASYNC_MSG_TAG 101 
 #define D_MSG_TAG 2
-#define MAX_ASYNC_MSG_TAG MPI_TAG_UB - D_MSG_TAG
+#define MAX_ASYNC_MSG_TAG 32000 // According to MPI spec tag upper bound is guaranteed to be no less than 32767 (https://www.mpi-forum.org/docs/mpi-4.1/mpi41-report.pdf page 36, chapter 3.2.3)
 #define CPU_STREAMS_SUPPORTED 2

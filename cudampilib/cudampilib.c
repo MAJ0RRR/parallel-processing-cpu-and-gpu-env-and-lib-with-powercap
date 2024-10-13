@@ -75,7 +75,7 @@ int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 // Counter that holds a unique tag for asynchronously exchanged messages
 // it increments by 2 (D_MSG_TAG) to accomodate data message and status
-int asyncMsgCounter = 0;
+int asyncMsgCounter = MIN_ASYNC_MSG_TAG;
 
 int getMsgCounter() {
   int result;
@@ -961,7 +961,6 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
   // run remotely
   int counter = getMsgCounter();
-  log_message(LOG_ERROR, "counter = %d, max = %d", counter, MAX_ASYNC_MSG_TAG);
   if (kind == cudaMemcpyHostToDevice) {
     // First just send the request with number of bytes
     size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long) + sizeof(int);
