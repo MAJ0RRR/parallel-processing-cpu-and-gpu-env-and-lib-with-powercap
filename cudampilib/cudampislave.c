@@ -16,7 +16,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
-#define EXECUTE_CPU_OPS_FULLY_ASYNC
 #define ENABLE_LOGGING
 #include "logger.h"
 
@@ -50,13 +49,11 @@ typedef struct task_queue_entry {
 TAILQ_HEAD(task_queue_head, task_queue_entry) task_queue;
 omp_lock_t queue_lock;
 
-#ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
 // CPU task launcher thread will wait on this lock until there are tasks available
 // When there are no tasks in the queue, the lock is set
 // When new task is being added to the queue, lock is being unset
 omp_lock_t task_available_lock;
 omp_lock_t synchronize_lock;
-#endif
 
 int scheduledTasksInQueue = 0;
 void launchkernel(void *devPtr);
@@ -83,15 +80,12 @@ typedef struct cpu_device_to_host_args {
 void cpuSynchronize()
 {
   log_message(LOG_DEBUG, "Synchronizing CPU tasks");
-  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   // Check if there are tasks waiting to be synchronized
   omp_set_lock(&synchronize_lock);
+  log_message(LOG_DEBUG, "dududSynchronizing CPU tasks");
   // Free the lock back
   omp_unset_lock(&synchronize_lock);
-  #else
-  // Synchronize all threads
-  #pragma omp taskwait
-  #endif
+  log_message(LOG_DEBUG, "doneSynchronizing CPU tasks");
 }
 
 void cpuHostToDeviceTaskAsync(void* arg) {
@@ -122,13 +116,9 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
 {
   // This function takes a function pointer and argument and adds task to execute it to the list
   // Execution can be done remotely by another thread signaled with task_available_lock
-  // Alternatively, task_available_lock can be not used and
-  // execution be started synchronously, just after calling this function
 
-  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   // Try setting lock if it is not set (no tasks in the queue);
   omp_test_lock(&synchronize_lock);
-  #endif
 
   task_queue_entry_t *new_dep = (task_queue_entry_t *)malloc(sizeof(task_queue_entry_t));
   if (new_dep == NULL) {
@@ -146,15 +136,12 @@ void allocateCpuTask(void (*task_func)(void *), void *arg)
 
   TAILQ_INSERT_TAIL(&task_queue, new_dep, entries);
 
-  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   // Signal the task_launcher that a task is available
   // Unlock task_available_lock to allow task_launcher to proceed
   log_message(LOG_DEBUG, "Unsetting task lock\n");
   omp_unset_lock(&task_available_lock);
-  #endif
 
   omp_unset_lock(&queue_lock);
-
 
   log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
 }
@@ -191,6 +178,14 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
       // Free the current dependency node if there are no other tasks depending on it
       if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
         TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
+        
+        // No next task meaning queue is empty
+        // Set task_available lock here, so that there wouldn't be a scenario
+        // that between now and new lock set there would be a task added
+        log_message(LOG_DEBUG, "Unsetting task lock inisde launcher\n");
+        
+        omp_unset_lock(&synchronize_lock);
+        omp_test_lock(&task_available_lock); 
       }
       scheduledTasksInQueue -= 1;
       omp_unset_lock(&queue_lock);
@@ -215,15 +210,13 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry)
       if (TAILQ_NEXT(current_task_queue_entry, entries) == NULL){
         TAILQ_REMOVE(&task_queue, current_task_queue_entry, entries);
 
-        #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
         // No next task meaning queue is empty
         // Set task_available lock here, so that there wouldn't be a scenario
         // that between now and new lock set there would be a task added
-        log_message(LOG_DEBUG, "Setting task lock inisde launcher\n");
+        log_message(LOG_DEBUG, "Unsetting task lock inisde launcher\n");
         
         omp_unset_lock(&synchronize_lock);
         omp_test_lock(&task_available_lock); 
-        #endif
       }
 
       scheduledTasksInQueue -= 1;
@@ -258,12 +251,10 @@ int main(int argc, char **argv) {
   // those to local GPU(s)
 
   omp_init_lock(&queue_lock);
-  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   omp_init_lock(&synchronize_lock);
   omp_init_lock(&task_available_lock);
   // Set the lock since there are no tasks in queue
   omp_set_lock(&task_available_lock);
-  #endif
 
   // Initialize the queue
   TAILQ_INIT(&task_queue);
@@ -359,10 +350,8 @@ int main(int argc, char **argv) {
   int deviceThreads = numberOfCpuThreads + __cudampi__localGpuDeviceCount; 
   int numberOfThreads = deviceThreads;
   
-  #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
   // Add one thread for executing CPU operations asynchronously
   numberOfThreads += 1;
-  #endif
 
   #pragma omp parallel num_threads(numberOfThreads)
   {
@@ -697,9 +686,6 @@ int main(int argc, char **argv) {
         if (args->devPtr != NULL && args->srcPtr != NULL && args->count > 0) {
           log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
           allocateCpuTask(cpuHostToDeviceTaskAsync, args);
-          #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
-          cpuTaskLauncher();
-          #endif
           e = cudaSuccess;
         }
 
@@ -729,9 +715,6 @@ int main(int argc, char **argv) {
           
           log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
           allocateCpuTask(cpuDeviceToHostTaskAsync, args);
-          #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
-          cpuTaskLauncher();
-          #endif
         }
 
         // Send data synchronously and receive asynchronously in master
@@ -766,9 +749,6 @@ int main(int argc, char **argv) {
 
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
         allocateCpuTask(cpuLaunchKernelTask, *((void **)rdata));
-        #ifndef EXECUTE_CPU_OPS_FULLY_ASYNC
-        cpuTaskLauncher();
-        #endif
         
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
@@ -830,12 +810,8 @@ int main(int argc, char **argv) {
 
     } while (status.MPI_TAG != __cudampi__CUDAMPIFINALIZE);
     terminated = 1;
-    #ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
     omp_unset_lock(&task_available_lock);
-    #endif
   }
-
-#ifdef EXECUTE_CPU_OPS_FULLY_ASYNC
 else
 {
   int localTaskCounter = 0 ;
@@ -866,7 +842,6 @@ else
   log_message(LOG_DEBUG, "Terminated task handling thread!");
   omp_destroy_lock(&task_available_lock);
 }
-#endif
 }
   MPI_Finalize();
   omp_destroy_lock(&queue_lock);
