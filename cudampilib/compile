@@ -10,7 +10,7 @@ VECMAXDIV_DIR="vecmaxdiv"
 
 mkdir -p $BUILD_DIR
 
-gcc -c cudampicommon.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampicommon.o
+gcc -fopenmp -c cudampicommon.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampicommon.o
 mpicc -c cudampilib.c -I/usr/local/cuda/include -Iinclude -o $BUILD_DIR/cudampilib.o 
 
 #nvcc -c $APPS_DIR/$APP_DIR/appkernel.cu -o $BUILD_DIR/appkernel.o
@@ -20,10 +20,10 @@ nvcc -c $APPS_DIR/$COLLATZ_DIR/appkernelcollatz.cu -o $BUILD_DIR/appkernelcollat
 nvcc -c $APPS_DIR/$PATTERNSEARCH_DIR/appkernelpatternsearch.cu -o $BUILD_DIR/appkernelpatternsearch.o -Iinclude
 
 
-gcc -c $APPS_DIR/$COLLATZ_DIR/cpukernelcollatz.c -Iinclude -o $BUILD_DIR/cpukernelcollatz.o
-gcc -c $APPS_DIR/$VECADD_DIR/cpukernelvecadd.c -Iinclude -o $BUILD_DIR/cpukernelvecadd.o
-gcc -c $APPS_DIR/$VECMAXDIV_DIR/cpukernelvecmaxdiv.c -Iinclude -o $BUILD_DIR/cpukernelvecmaxdiv.o -lm
-gcc -c $APPS_DIR/$PATTERNSEARCH_DIR/cpukernelpatternsearch.c -Iinclude -o $BUILD_DIR/cpukernelpatternsearch.o
+gcc -fopenmp -c $APPS_DIR/$COLLATZ_DIR/cpukernelcollatz.c -Iinclude -o $BUILD_DIR/cpukernelcollatz.o
+gcc -fopenmp -c $APPS_DIR/$VECADD_DIR/cpukernelvecadd.c -Iinclude -o $BUILD_DIR/cpukernelvecadd.o
+gcc -fopenmp -c $APPS_DIR/$VECMAXDIV_DIR/cpukernelvecmaxdiv.c -Iinclude -o $BUILD_DIR/cpukernelvecmaxdiv.o -lm
+gcc -fopenmp -c $APPS_DIR/$PATTERNSEARCH_DIR/cpukernelpatternsearch.c -Iinclude -o $BUILD_DIR/cpukernelpatternsearch.o
 
 #mpicc -fopenmp -o $BUILD_DIR/cudampislave cudampislave.c $BUILD_DIR/appkernel.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++
 mpicc -fopenmp -o $BUILD_DIR/cudampislave-vecmaxdiv cudampislave.c $BUILD_DIR/cpukernelvecmaxdiv.o $BUILD_DIR/appkernelvecmaxdiv.o $BUILD_DIR/cudampicommon.o -I/usr/local/cuda/include -Iinclude -L/usr/local/cuda/lib64 -lcudart -lstdc++ -lm
