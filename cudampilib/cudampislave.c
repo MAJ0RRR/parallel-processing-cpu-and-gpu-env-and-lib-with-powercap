@@ -59,7 +59,7 @@ omp_lock_t synchronize_locks[CPU_STREAMS_SUPPORTED];
 
 int scheduledTasksInStream[CPU_STREAMS_SUPPORTED];
 omp_lock_t cpuEnergyLock;
-int cpuEnergyMeasured = 0;
+int isInitialCpuEnergyMeasured = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
@@ -749,7 +749,7 @@ int main(int argc, char **argv) {
           omp_set_lock(&cpuEnergyLock);
           if (!cpuEnergyMeasured)
           {
-            cpuEnergyMeasured = 1;
+            isInitialCpuEnergyMeasured = 1;
             getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured));
           }
           omp_unset_lock(&cpuEnergyLock);
