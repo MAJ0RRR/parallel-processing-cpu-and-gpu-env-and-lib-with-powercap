@@ -16,6 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
+#define CPU_STREAMS_SUPPORTED 1
 #define ENABLE_LOGGING
 #include "logger.h"
 
@@ -36,6 +37,8 @@ MPI_Comm *__cudampi__communicators;
 int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
+
+unsigned long cpuStreamsValid[CPU_STREAMS_SUPPORTED];
 
 typedef struct task_queue_entry {
     TAILQ_ENTRY(task_queue_entry) entries; // Use sys/queue.h macros for queue entries
@@ -114,7 +117,7 @@ void cpuLaunchKernelTask(void* arg) {
   launchcpukernel(arg, __cudampi__localFreeThreadCount - 1);
 }
 
-void allocateCpuTask(void (*task_func)(void *), void *arg)
+void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long stream)
 {
   // This function takes a function pointer and argument and adds task to execute it to the list
   // Execution can be done remotely by another thread signaled with task_available_lock
@@ -668,8 +671,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQASYNC) {
-        int rsize = sizeof(void*) + sizeof(unsigned long);
-
+        int rsize = sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long);
         // Receive a request with number of bytes that will be sent and a pointer
         unsigned char rdata[rsize];
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICEREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -680,12 +682,13 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long*)(rdata + sizeof(void*)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
+        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC\n");
-        allocateCpuTask(cpuHostToDeviceTaskAsync, args);
+        allocateCpuTaskInStream(cpuHostToDeviceTaskAsync, args, stream);
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQASYNC) {
-        int rsize = sizeof(void *) + sizeof(unsigned long);
+        int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long);
         unsigned char rdata[rsize];
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -695,8 +698,9 @@ int main(int argc, char **argv) {
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
+        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC\n");
-        allocateCpuTask(cpuDeviceToHostTaskAsync, args);
+        allocateCpuTaskInStream(cpuDeviceToHostTaskAsync, args, stream);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
@@ -720,13 +724,14 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
-        int rsize = sizeof(void *);
+        int rsize = sizeof(void *) + sizeof(unsigned long);
         unsigned char rdata[rsize];
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
+        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) ));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ\n");
-        allocateCpuTask(cpuLaunchKernelTask, *((void **)rdata));
+        allocateCpuTaskInStream(cpuLaunchKernelTask, *((void **)rdata), stream);
         
         MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
@@ -784,6 +789,54 @@ int main(int argc, char **argv) {
         cudaError_t e = cudaStreamDestroy(stream);
 
         MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPISTREAMDESTROYRESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CPUSTREAMCREATEREQ) {
+
+        MPI_Recv(NULL, 0, MPI_UNSIGNED_LONG, 0, __cudampi__CPUSTREAMCREATEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        // create a new stream on CPU
+        cudaError_t e = cudaErrorInvalidResourceHandle;
+
+        int freeStreamSlot = -1;
+        for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++) {
+          // Find free stream slot
+          if (cpuStreamsValid[i] == 0)
+          {
+            cpuStreamsValid[i] = 1;
+            freeStreamSlot = i;
+            e = cudaSuccess;
+            break;
+          }
+        }
+
+        int ssize = sizeof(unsigned long) + sizeof(cudaError_t);
+        // send confirmation with the actual pointer
+        unsigned char sdata[ssize];
+
+        *((unsigned long *)sdata) = freeStreamSlot;
+        *((cudaError_t *)(sdata + sizeof(cudaStream_t))) = e;
+
+        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUSTREAMCREATERESP, __cudampi__communicators[omp_get_thread_num()]);
+      }
+
+      if (status.MPI_TAG == __cudampi__CPUSTREAMDESTROYREQ) {
+        int rsize = sizeof(unsigned long);
+        unsigned char rdata[rsize];
+
+        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUSTREAMDESTROYREQ, __cudampi__communicators[omp_get_thread_num()], &status);
+
+        unsigned long stream = *((unsigned long *)rdata);
+
+        cudaError_t e = cudaErrorInvalidResourceHandle;
+
+        if(stream < CPU_STREAMS_SUPPORTED)
+        {
+          cpuStreamsValid[stream] = 0;
+          e = cudaSuccess;
+        }
+
+        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CPUSTREAMDESTROYRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
     } while (status.MPI_TAG != __cudampi__CUDAMPIFINALIZE);
