@@ -74,7 +74,9 @@ float __cudampi__globalpowerlimit;
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 typedef struct memcpy_queue_entry {
-    MPI_Request request;
+    MPI_Request dataRequest;
+    MPI_Request statusRequest;
+    cudaError_t status;
     TAILQ_ENTRY(memcpy_queue_entry) entries;
 } memcpy_queue_entry_t;
 
@@ -92,7 +94,27 @@ void initiateAsyncRecv(void* dst, unsigned long count)
       log_message(LOG_ERROR, "Failed to allocate memory");
   }
 
-  MPI_Irecv(dst, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
+  // Receive the data
+  MPI_Irecv(dst, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->dataRequest);
+
+  // Receive the status code
+  MPI_Irecv((unsigned char*)(&item->status), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTASYNCRESP, __cudampi__currentCommunicator,  &item->statusRequest);
+
+  TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
+}
+
+void initiateAsyncSend(const void* src, unsigned long count)
+{ 
+  memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
+  if (item == NULL) {
+      log_message(LOG_ERROR, "Failed to allocate memory");
+  }
+  
+  // Send the data
+  MPI_Isend(src, count, MPI_UNSIGNED_CHAR, 1, __cudampi__HOSTTODEVICEDATA, __cudampi__currentCommunicator, &item->dataRequest);
+
+  // Receive the status code
+  MPI_Irecv((unsigned char*)(&item->status), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, __cudampi__HOSTTODEVICEASYNCRESP, __cudampi__currentCommunicator,  &item->statusRequest);
 
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
@@ -104,8 +126,14 @@ void process_queue() {
     while (!TAILQ_EMPTY(__cudampi__currentMemcpyQueue)) {
         item = TAILQ_FIRST(__cudampi__currentMemcpyQueue);
 
-        // Wait for the request to be received
-        MPI_Wait(&item->request, &status);
+        // Wait for the request data to be received / sent
+        MPI_Wait(&item->dataRequest, &status);
+        MPI_Wait(&item->statusRequest, &status);
+
+        if(item->status != cudaSuccess)
+        {
+          log_message(LOG_ERROR, "Received non zero status code: %d", item->status);
+        }
 
         TAILQ_REMOVE(__cudampi__currentMemcpyQueue, item, entries);
     }
@@ -916,20 +944,19 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   // run remotely
   if (kind == cudaMemcpyHostToDevice) {
-    size_t ssize = sizeof(void *) + count;
+    // First just send the request with number of bytes
+    size_t ssize = sizeof(void *) + sizeof(unsigned long);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = dst;
-    memcpy(sdata + sizeof(void *), src, count); // copy input data
+    *((unsigned long*)(sdata + sizeof(void*))) = count;
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICEREQASYNC, __cudampi__currentCommunicator);
 
-    int rsize = sizeof(cudaError_t);
-    unsigned char rdata[rsize];
+    // Then send the data asynchronously 
+    initiateAsyncSend(src, count);
 
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICERESPASYNC, __cudampi__currentCommunicator, NULL);
-
-    return ((cudaError_t)rdata);
+    return cudaSuccess;
 
   } else if (kind == cudaMemcpyDeviceToHost) {
 
@@ -939,16 +966,13 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
 
-
+    // Start receiveing data asynchronously
     initiateAsyncRecv(dst, count);
+
+    // Send the request
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__currentCommunicator);
 
-    int rsize = sizeof(cudaError_t);
-    unsigned char rdata[rsize];
-
-   MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESPASYNC, __cudampi__currentCommunicator, NULL);
-
-   return ((cudaError_t)rdata);
+    return cudaSuccess;
   }
 }
 
