@@ -40,21 +40,19 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
   double *devPtrc = (double *)(((void **)devPtr)[1]);
 
   #pragma omp parallel for num_threads(num_threads)
+  for (long my_index = 0; my_index < num_elements; my_index++) 
   {
-    for (long my_index = 0; my_index < num_elements; my_index++) 
-    {
-      unsigned long start = devPtra[my_index];
-      unsigned long counter = 0;
+    unsigned long start = devPtra[my_index];
+    unsigned long counter = 0;
 
-      if (isprime(start)) 
+    if (isprime(start)) 
+    {
+      for (; (start > 1); counter++) 
       {
-        for (; (start > 1); counter++) 
-        {
-          start = (start % 2) ? (3 * start + 1) : (start / 2);
-        }
+        start = (start % 2) ? (3 * start + 1) : (start / 2);
       }
-      devPtrc[my_index] = counter;
     }
+    devPtrc[my_index] = counter;
   }
 }
 

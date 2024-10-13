@@ -27,38 +27,36 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
   double *devPtrc = (double *)(((void **)devPtr)[2]);
 
   #pragma omp parallel for num_threads(num_threads)
-  {
-    for (long my_index = 0 ; my_index < num_elements; my_index++)
+for (long my_index = 0 ; my_index < num_elements; my_index++)
+{
+    long i;
+    long result = 1;
+    long max = sqrt(devPtra[my_index]);
+    long elem = devPtra[my_index];
+    for (i = 2; i < max; i++) 
     {
-        long i;
-        long result = 1;
-        long max = sqrt(devPtra[my_index]);
-        long elem = devPtra[my_index];
-        for (i = 2; i < max; i++) 
+        if (!(elem % i)) 
         {
-            if (!(elem % i)) 
+            if (i >= result) 
             {
-                if (i >= result) 
-                {
-                    result = i;
-                }
+                result = i;
             }
         }
-        max = sqrt(devPtrb[my_index]);
-        elem = devPtrb[my_index];
-        for (i = 2; i < max; i++) 
-        {
-            if (!(elem % i)) 
-            {
-                if (i >= result) 
-                {
-                    result = i;
-                }
-            }
-        }
-        devPtrc[my_index] = result;
     }
-  }
+    max = sqrt(devPtrb[my_index]);
+    elem = devPtrb[my_index];
+    for (i = 2; i < max; i++) 
+    {
+        if (!(elem % i)) 
+        {
+            if (i >= result) 
+            {
+                result = i;
+            }
+        }
+    }
+    devPtrc[my_index] = result;
+}
 }
 
 extern void launchcpukernel(void *devPtr, int num_threads) 

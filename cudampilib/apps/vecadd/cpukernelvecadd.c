@@ -26,11 +26,9 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
     double *devPtrc = (double *)(((void **)devPtr)[2]);
 
     #pragma omp parallel for num_threads(num_threads)
+    for (long my_index = 0; my_index < num_elements; my_index++) 
     {
-        for (long my_index = 0; my_index < num_elements; my_index++) 
-        {
-            devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
-        }
+        devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
     }
 }
 
