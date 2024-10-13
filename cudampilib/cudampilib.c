@@ -28,6 +28,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__currentDevice  __cudampi__currentdevice[omp_get_thread_num()]
 #define __cudampi__currentCommunicator  __cudampi__communicators[__cudampi__currentDevice]
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
+#define __cudampi__currentMemcpyQueue &(__cudampi__memcpy_queues[omp_get_thread_num()])
 
 
 int *__cudampi__GPUcountspernode;
@@ -83,8 +84,8 @@ typedef struct memcpy_queue_entry {
 // Define the queue head
 TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
 
-// Declare and initialize the queue
-struct memcpy_queue_head memcpy_queue;
+// Declare queues for memcpy operations
+struct memcpy_queue_head __cudampi__memcpy_queues[__CUDAMPI_MAX_THREAD_COUNT];
 
 
 void initiateAsyncRecv(void* dst, unsigned long count)
@@ -95,22 +96,24 @@ void initiateAsyncRecv(void* dst, unsigned long count)
   }
  
   unsigned char* rdata = malloc(count * sizeof(unsigned char));  // Allocate memory dynamically for rdata
+  if (rdata == NULL) {
+      log_message(LOG_ERROR, "Failed to allocate memory");
+  }
 
   MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
 
   item->buffer = rdata;
   item->dst = dst;
   item->count = count;
-  TAILQ_INSERT_TAIL(&memcpy_queue, item, entries);
+  TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
 void process_queue() {
     memcpy_queue_entry_t* item;
     MPI_Status status;
     // Process all items in the queue
-    while (!TAILQ_EMPTY(&memcpy_queue)) {
-        item = TAILQ_FIRST(&memcpy_queue);
-        TAILQ_REMOVE(&memcpy_queue, item, entries);
+    while (!TAILQ_EMPTY(__cudampi__currentMemcpyQueue)) {
+        item = TAILQ_FIRST(__cudampi__currentMemcpyQueue);
 
         // Wait for the request to be received
         MPI_Wait(&item->request, &status);
@@ -118,6 +121,7 @@ void process_queue() {
         // Process the received data
         memcpy(item->dst, item->buffer, item->count);
         free(item->buffer);
+        TAILQ_REMOVE(__cudampi__currentMemcpyQueue, item, entries);
     }
 }
 
@@ -352,8 +356,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   int mtsprovided;
   int i;
 
-  TAILQ_INIT(&memcpy_queue);
-
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
   if (mtsprovided != MPI_THREAD_MULTIPLE) {
@@ -510,6 +512,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     MPI_Group_incl(groupall, 2, ranks, &tempgroup);
 
     MPI_Comm_create(MPI_COMM_WORLD, tempgroup, &(__cudampi__communicators[i]));
+  }
+
+  for (int i = 0; i < __cudampi_totaldevicecount; i++ ) {
+    TAILQ_INIT(&(__cudampi__memcpy_queues[i]));
   }
 }
 
