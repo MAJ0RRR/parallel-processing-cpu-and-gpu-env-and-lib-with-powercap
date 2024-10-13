@@ -16,7 +16,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
-#define CPU_STREAMS_SUPPORTED 1
 #define ENABLE_LOGGING
 #include "logger.h"
 
@@ -66,12 +65,14 @@ void launchcpukernel(void *devPtr, int thread_count);
 typedef struct cpu_host_to_device_args {
   void *devPtr;
   size_t count;
+  int tag;
   MPI_Comm* comm;
 } cpu_host_to_device_args_t;
 
 typedef struct cpu_device_to_host_args {
   void *devPtr;
   unsigned long count;
+  int tag;
   MPI_Comm* comm;
 } cpu_device_to_host_args_t;
 
@@ -93,10 +94,10 @@ void cpuHostToDeviceTaskAsync(void* arg) {
 
   if (args->devPtr != NULL && args->count > 0){
     e = cudaSuccess;
-    MPI_Recv((unsigned char *)args->devPtr, args->count, MPI_UNSIGNED_CHAR, 0, __cudampi__HOSTTODEVICEDATA, *(args->comm), NULL);
+    MPI_Recv((unsigned char *)args->devPtr, args->count, MPI_UNSIGNED_CHAR, 0, args->tag, *(args->comm), NULL);
   }
 
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__HOSTTODEVICEASYNCRESP, *(args->comm));
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0,  args->tag + 1, *(args->comm));
 
   free(arg);
 }
@@ -107,10 +108,10 @@ void cpuDeviceToHostTaskAsync(void* arg) {
   
   if (args->devPtr != NULL && args->count > 0){
     e = cudaSuccess;
-    MPI_Send((unsigned char*)(args->devPtr), args->count , MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTDATA, *(args->comm));
+    MPI_Send((unsigned char*)(args->devPtr), args->count , MPI_UNSIGNED_CHAR, 0,  args->tag, *(args->comm));
   }
 
-  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__DEVICETOHOSTASYNCRESP, *(args->comm));
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0,  args->tag + 1, *(args->comm));
 
   free(arg);
 }
@@ -683,7 +684,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQASYNC) {
-        int rsize = sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long);
+        int rsize = sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long) + sizeof(int);
         // Receive a request with number of bytes that will be sent and a pointer
         unsigned char rdata[rsize];
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUHOSTTODEVICEREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -692,15 +693,16 @@ int main(int argc, char **argv) {
         cpu_host_to_device_args_t* args = malloc(sizeof(cpu_host_to_device_args_t));
         args->devPtr = *((void **)rdata);
         args->count = *((unsigned long*)(rdata + sizeof(void*)));
+        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
+        args->tag = *((int*)(rdata + sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUHOSTTODEVICEREQASYNC in stream %d\n", stream);
         allocateCpuTaskInStream(cpuHostToDeviceTaskAsync, args, stream);
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQASYNC) {
-        int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long);
+        int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long) + sizeof(int);
         unsigned char rdata[rsize];
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPUDEVICETOHOSTREQASYNC, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -708,9 +710,10 @@ int main(int argc, char **argv) {
         cpu_device_to_host_args_t* args = malloc(sizeof(cpu_device_to_host_args_t));
         args->devPtr = *((void **)rdata);
         args->count = *((unsigned long *)(rdata + sizeof(void *)));
+        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
+        args->tag = *((int*)(rdata + sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long)));
         args->comm = &__cudampi__communicators[omp_get_thread_num()];
 
-        unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) + sizeof(unsigned long)));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPUDEVICETOHOSTREQASYNC in stream %d\n", stream);
         allocateCpuTaskInStream(cpuDeviceToHostTaskAsync, args, stream);
       }
