@@ -42,6 +42,11 @@ Host des01 des02 des03 des04 des05 des06 des07 des08 des09 des10 des11 des12 des
   User sXXXXXX
   ProxyJump kask
 ``` 
+Jeśli po jumpie VSCode chce logować się na innego usera, mimo tego że jest ustawiony na sXXXXXX, trzeba wtedy ustawić ostatnią linijkę na:
+```
+  ProxyJump sXXXXXX@kask
+```
+
 2. Łączysz się do danej maszyny w labie `ssh des05` 
 
 
