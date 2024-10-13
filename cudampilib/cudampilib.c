@@ -74,9 +74,6 @@ float __cudampi__globalpowerlimit;
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 typedef struct memcpy_queue_entry {
-    void *dst;
-    unsigned long count;
-    unsigned char* buffer;
     MPI_Request request;
     TAILQ_ENTRY(memcpy_queue_entry) entries;
 } memcpy_queue_entry_t;
@@ -94,17 +91,9 @@ void initiateAsyncRecv(void* dst, unsigned long count)
   if (item == NULL) {
       log_message(LOG_ERROR, "Failed to allocate memory");
   }
- 
-  unsigned char* rdata = malloc(count * sizeof(unsigned char));  // Allocate memory dynamically for rdata
-  if (rdata == NULL) {
-      log_message(LOG_ERROR, "Failed to allocate memory");
-  }
 
-  MPI_Irecv(rdata, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
+  MPI_Irecv(dst, count, MPI_UNSIGNED_CHAR, 1, __cudampi__DEVICETOHOSTDATA, __cudampi__currentCommunicator, &item->request);
 
-  item->buffer = rdata;
-  item->dst = dst;
-  item->count = count;
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
@@ -118,9 +107,6 @@ void process_queue() {
         // Wait for the request to be received
         MPI_Wait(&item->request, &status);
 
-        // Process the received data
-        memcpy(item->dst, item->buffer, item->count);
-        free(item->buffer);
         TAILQ_REMOVE(__cudampi__currentMemcpyQueue, item, entries);
     }
 }
