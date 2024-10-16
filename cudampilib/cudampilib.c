@@ -119,14 +119,31 @@ void initiateAsyncRecv(void* dst, unsigned long count, int counter)
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
-void initiateAsyncSend(const void* src, unsigned long count, int counter)
+void initiateAsyncSendCpu(const void* src, unsigned long count, int counter)
 { 
+  // For CPU, asynchronously send data to device and asynchronously wait for response
   memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
   if (item == NULL) {
       log_message(LOG_ERROR, "Failed to allocate memory");
   }
   // Send the data
   MPI_Isend(src, count, MPI_UNSIGNED_CHAR, 1, counter, __cudampi__currentCommunicator, &item->dataRequest);
+
+  // Receive the status code
+  MPI_Irecv((unsigned char*)(&item->status), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, counter + 1, __cudampi__currentCommunicator,  &item->statusRequest);
+
+  TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
+}
+
+void waitForAsyncSendResponse(int counter)
+{ 
+  // For GPU, synchronously send data to device and asynchronously wait for response
+  memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
+  if (item == NULL) {
+      log_message(LOG_ERROR, "Failed to allocate memory");
+  }
+  // Send the data
+  item->dataRequest = NULL;
 
   // Receive the status code
   MPI_Irecv((unsigned char*)(&item->status), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 1, counter + 1, __cudampi__currentCommunicator,  &item->statusRequest);
@@ -142,7 +159,9 @@ void process_queue() {
         item = TAILQ_FIRST(__cudampi__currentMemcpyQueue);
 
         // Wait for the request data to be received / sent
-        MPI_Wait(&item->dataRequest, &status);
+        if (&item->dataRequest != NULL) {
+          MPI_Wait(&item->dataRequest, &status);
+        }
         MPI_Wait(&item->statusRequest, &status);
 
         if(item->status != cudaSuccess)
@@ -912,25 +931,24 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
 
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
 
+  int counter = getMsgCounter();
   if (__cudampi_isLocalGpu) { // run locally
     return cudaMemcpyAsync(dst, src, count, kind, stream);
   } else if (kind == cudaMemcpyHostToDevice) {
 
-    size_t ssize = sizeof(void *) + sizeof(cudaStream_t) + count;
+    size_t ssize = sizeof(void *) + sizeof(cudaStream_t) + sizeof(int) + count;
     unsigned char sdata[ssize];
 
     *((void **)sdata) = dst;
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
-    memcpy(sdata + sizeof(void *) + sizeof(cudaStream_t), src, count); // copy input data
+    *((int *)(sdata + sizeof(void *) + sizeof(cudaStream_t))) = counter;
+    memcpy(sdata + sizeof(void *) + sizeof(cudaStream_t) + sizeof(int), src, count); // copy input data
+
+    waitForAsyncSendResponse(counter);
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__currentCommunicator);
 
-    int rsize = sizeof(cudaError_t);
-    unsigned char rdata[rsize];
-
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__currentCommunicator, NULL);
-
-    return ((cudaError_t)rdata);
+    return cudaSuccess;
 
   } else if (kind == cudaMemcpyDeviceToHost) {
 
@@ -969,7 +987,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICEREQASYNC, __cudampi__currentCommunicator);
 
     // Then send the data asynchronously 
-    initiateAsyncSend(src, count, counter);
+    initiateAsyncSendCpu(src, count, counter);
 
     return cudaSuccess;
 

@@ -16,6 +16,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "cudampi.h"
 #include "cudampicommon.h"
 
+// + 1 stream for asynchronously processing GPU responses to master
+#define ALL_CPU_STREAMS CPU_STREAMS_SUPPORTED + 1
+// number of stream dedicated for sending GPU responses to master
+#define CPU_STREAM_FOR_GPU_RESPONSES CPU_STREAMS_SUPPORTED
+
 #define ENABLE_LOGGING
 #include "logger.h"
 
@@ -48,16 +53,16 @@ typedef struct task_queue_entry {
     int scheduled;    // Flag to indicate if the task has been scheduled
 } task_queue_entry_t;
 
-TAILQ_HEAD(task_queue_head, task_queue_entry) task_queues[CPU_STREAMS_SUPPORTED];
-omp_lock_t queue_locks[CPU_STREAMS_SUPPORTED];
+TAILQ_HEAD(task_queue_head, task_queue_entry) task_queues[ALL_CPU_STREAMS];
+omp_lock_t queue_locks[ALL_CPU_STREAMS];
 
 // CPU task launcher thread will wait on this lock until there are tasks available
 // When there are no tasks in the queue, the lock is set
 // When new task is being added to the queue, lock is being unset
-omp_lock_t task_available_locks[CPU_STREAMS_SUPPORTED];
-omp_lock_t synchronize_locks[CPU_STREAMS_SUPPORTED];
+omp_lock_t task_available_locks[ALL_CPU_STREAMS];
+omp_lock_t synchronize_locks[ALL_CPU_STREAMS];
 
-int scheduledTasksInStream[CPU_STREAMS_SUPPORTED];
+int scheduledTasksInStream[ALL_CPU_STREAMS];
 omp_lock_t cpuEnergyLock;
 int isInitialCpuEnergyMeasured = 0;
 
@@ -72,12 +77,27 @@ typedef struct cpu_host_to_device_args {
   MPI_Comm* comm;
 } cpu_host_to_device_args_t;
 
+typedef struct gpu_host_to_device_args {
+  cudaEvent_t event;
+  int tag;
+  MPI_Comm* comm;
+  unsigned  char* buffer;
+} gpu_host_to_device_args_t;
+
 typedef struct cpu_device_to_host_args {
   void *devPtr;
   unsigned long count;
   int tag;
   MPI_Comm* comm;
 } cpu_device_to_host_args_t;
+
+typedef struct gpu_device_to_host_args {
+  cudaEvent_t event;
+  unsigned  char* buffer;
+  unsigned long count;
+  int tag;
+  MPI_Comm* comm;
+} gpu_device_to_host_args_t;
 
 void cpuSynchronize()
 {
@@ -119,6 +139,33 @@ void cpuDeviceToHostTaskAsync(void* arg) {
   free(arg);
 }
 
+void gpuHostToDeviceTaskAsync(void* arg) {
+  gpu_host_to_device_args_t *args = (gpu_host_to_device_args_t*) arg;
+
+  cudaEventSynchronize(args->event);
+  cudaError_t e = cudaGetLastError();
+
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0,  args->tag + 1, *(args->comm));
+
+  cudaFreeHost(args->buffer);
+  free(arg);
+}
+
+void gpuDeviceToHostTaskAsync(void* arg) {
+  gpu_device_to_host_args_t *args = (gpu_device_to_host_args_t*) arg;
+
+  cudaEventSynchronize(args->event);
+  cudaError_t e = cudaGetLastError();
+  
+  if (e == cudaSuccess){
+    MPI_Send((unsigned char*)(args->buffer), args->count , MPI_UNSIGNED_CHAR, 0,  args->tag, *(args->comm));
+  }
+
+  MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0,  args->tag + 1, *(args->comm));
+
+  free(arg);
+}
+
 void cpuLaunchKernelTask(void* arg) {
   // kernel just takes void*
   launchcpukernel(arg, __cudampi__localFreeThreadCount - 1);
@@ -128,7 +175,7 @@ void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long
 {
   // This function takes a function pointer and argument and adds task to execute it to the list
   // Execution can be done remotely by another thread signaled with task_available_lock
-  if (stream >= CPU_STREAMS_SUPPORTED) {
+  if (stream >= ALL_CPU_STREAMS) {
     log_message(LOG_ERROR, "Trying to allocate task in invalid stream");
     return;
   }
@@ -264,7 +311,7 @@ int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
-  for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
+  for (int i = 0; i < ALL_CPU_STREAMS; i++)
   {
     
     scheduledTasksInStream[i] = 0;
@@ -372,7 +419,7 @@ int main(int argc, char **argv) {
   if (CPU_STREAMS_SUPPORTED < 1 || CPU_STREAMS_SUPPORTED > 2) {
     log_message(LOG_ERROR, "It is only possible to launch 1 or 2 CPU streams. Currently attempted: %d", CPU_STREAMS_SUPPORTED);
   }
-  numberOfThreads += CPU_STREAMS_SUPPORTED;
+  numberOfThreads += ALL_CPU_STREAMS;
 
   #pragma omp parallel num_threads(numberOfThreads)
   {
@@ -561,21 +608,46 @@ int main(int argc, char **argv) {
         int rsize;
         MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rsize);
 
-        unsigned char rdata[rsize];
-
-        MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
-
-        void *devPtr = *((void **)rdata);
-        cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *)));
-
-        // now send the data to the GPU
-        cudaError_t e = cudaMemcpyAsync(devPtr, rdata + sizeof(void *) + sizeof(cudaStream_t), rsize - sizeof(void *) - sizeof(cudaStream_t), cudaMemcpyHostToDevice, stream);
-
-        if (cudaSuccess != cudaGetLastError()) {
-          log_message(LOG_ERROR, "\nError xxx host to dev async");
+        unsigned char* rdata;
+        cudaError_t e = cudaHostAlloc((void**)&rdata, rsize, cudaHostAllocDefault);
+        if (e != cudaSuccess) {
+            log_message(LOG_ERROR, "Error allocating host memory");
         }
+        else {
+          MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-        MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIHOSTTODEVICEASYNCRESP, __cudampi__communicators[omp_get_thread_num()]);
+          void *devPtr = *((void **)rdata);
+          cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *)));
+          int tag = *((int*)(rdata + sizeof(void*) + sizeof(cudaStream_t)));
+
+          
+          gpu_host_to_device_args_t* args = malloc(sizeof(gpu_host_to_device_args_t));
+
+          // now send the data to the GPU
+          cudaEvent_t event;
+          cudaEventCreate(&event);
+
+          e = cudaMemcpyAsync(devPtr, rdata + sizeof(void *) + sizeof(cudaStream_t) + sizeof(int), rsize - sizeof(void *) - sizeof(cudaStream_t) - sizeof(int), cudaMemcpyHostToDevice, stream);
+          cudaEventRecord(event, stream);
+
+          if (e != cudaSuccess)
+          {
+            log_message(LOG_ERROR, "Error allocating host memory");
+            MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0,  tag + 1, __cudampi__communicators[omp_get_thread_num()]);
+            cudaFreeHost(rdata);
+          }
+          else
+          {
+            // Schedule a task that would wait for the copy to complete and send back the response
+            args->tag = tag;
+            args->comm = &__cudampi__communicators[omp_get_thread_num()];
+            args->event = event;
+            args->buffer = rdata;
+
+            allocateCpuTaskInStream(gpuHostToDeviceTaskAsync, args, CPU_STREAM_FOR_GPU_RESPONSES);
+
+          }
+        }
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICETOHOSTREQ) {
@@ -874,7 +946,7 @@ int main(int argc, char **argv) {
     } while (status.MPI_TAG != __cudampi__CUDAMPIFINALIZE);
     terminated = 1;
     
-    for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++) {
+    for (int i = 0; i < ALL_CPU_STREAMS; i++) {
       omp_unset_lock(&task_available_locks[i]);
     }
   }
@@ -913,7 +985,7 @@ else
 }
   MPI_Finalize();
   
-  for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
+  for (int i = 0; i < ALL_CPU_STREAMS; i++)
   {
     omp_destroy_lock(&queue_locks[i]);
     omp_destroy_lock(&synchronize_locks[i]);
