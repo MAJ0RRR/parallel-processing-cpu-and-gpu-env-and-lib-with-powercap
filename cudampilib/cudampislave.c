@@ -743,18 +743,19 @@ int main(int argc, char **argv) {
 
       if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
         int rsize = sizeof(void *) + sizeof(unsigned long);
-        if (!cpuEnergyMeasured)
+        if (!isInitialCpuEnergyMeasured)
         {
           // Initialize CPU energy value
           omp_set_lock(&cpuEnergyLock);
-          if (!cpuEnergyMeasured)
+          if (!isInitialCpuEnergyMeasured)
           {
+            // This variable is unused since we just need to initialize lastEnergyMeasured and don't care about actual value
+            float cpuEnergyMeasured;
             isInitialCpuEnergyMeasured = 1;
-            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured));
+            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured);
           }
           omp_unset_lock(&cpuEnergyLock);
         }
-        // in this case in the message there is a serialized pointer
 
         unsigned char rdata[rsize];
 

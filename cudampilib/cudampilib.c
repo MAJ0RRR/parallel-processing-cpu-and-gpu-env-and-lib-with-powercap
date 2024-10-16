@@ -689,6 +689,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
   cudaError_t retVal;
   static int selecteddevices = 0; // only updated by thread 0
   int amimanager;                 // if the current thread is manager for device selection
+  float energy = -1, power = -1;
 
   // if ((powermeasurecounter[omp_get_thread_num()]%10)==4) {
 
@@ -720,18 +721,13 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
     // now get power measurement - this should be OK as we assume that computations might be taking place
 
-    //   if ((powermeasurecounter[omp_get_thread_num()]%10)==4) {
-
-    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-    __cudampi__devicepower[__cudampi__currentDevice] = getGPUpower(__cudampi__currentDevice);
-    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+    power = getGPUpower(__cudampi__currentDevice);
 
     retVal = cudaDeviceSynchronize();
   } else { // run synchronization remotely
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     int sdata = 0; // if 0 then means do not measure power, if 1 do measure on the slave side
-    float energy = -1, power = -1;
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
 
@@ -774,6 +770,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
     __cudampi__time[__cudampi__currentDevice].tv_sec = __cudampi__timestop[__cudampi__currentDevice].tv_sec - __cudampi__timestart[__cudampi__currentDevice].tv_sec;    // compute current time
     __cudampi__time[__cudampi__currentDevice].tv_usec = __cudampi__timestop[__cudampi__currentDevice].tv_usec - __cudampi__timestart[__cudampi__currentDevice].tv_usec; // compute current time
+    struct timeval elapsed_time = __cudampi__time[__cudampi__currentDevice];
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
