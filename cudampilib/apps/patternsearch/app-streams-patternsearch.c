@@ -108,8 +108,8 @@ int main(int argc, char **argv)
 
     if (__cudampi__isCpu())
     {
-    __cudampi__cpuMemcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice);
-    __cudampi__cpuMemcpyAsync(devPtr + sizeof(void *), &devPtrc, sizeof(void *), cudaMemcpyHostToDevice);
+    __cudampi__cpuMemcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice, 0);
+    __cudampi__cpuMemcpyAsync(devPtr + sizeof(void *), &devPtrc, sizeof(void *), cudaMemcpyHostToDevice, 0);
     }
     else
     {
@@ -133,14 +133,14 @@ int main(int argc, char **argv)
       } 
       else if (__cudampi__isCpu())
       {
-        __cudampi__cpuMemcpyAsync(devPtra, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice);
+        __cudampi__cpuMemcpyAsync(devPtra, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, 0);
         __cudampi__cpuKernel(devPtr);
-        __cudampi__cpuMemcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(char), cudaMemcpyDeviceToHost);
+        __cudampi__cpuMemcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(char), cudaMemcpyDeviceToHost, 0);
       }
       else 
       {
         __cudampi__cudaMemcpyAsync(devPtra, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream1);
-        __cudampi__kernelinstream(devPtr, stream1);
+        __cudampi__cudaKernelInStream(devPtr, stream1);
         __cudampi__cudaMemcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(char), cudaMemcpyDeviceToHost, stream1);
       }
       if (streamcount == 2) {
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
           else 
           {
             __cudampi__cudaMemcpyAsync(devPtra2, vectora + mycounter, (batchsize + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream2);
-            __cudampi__kernelinstream(devPtr2, stream2);
+            __cudampi__cudaKernelInStream(devPtr2, stream2);
             __cudampi__cudaMemcpyAsync(vectorc + mycounter, devPtrc2, batchsize * sizeof(char), cudaMemcpyDeviceToHost, stream2);
           }
         }

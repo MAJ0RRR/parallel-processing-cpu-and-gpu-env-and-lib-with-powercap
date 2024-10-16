@@ -48,9 +48,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define __cudampi__CPUDEVICETOHOSTREQ 36
 #define __cudampi__CPUDEVICETOHOSTRESP 37
 #define __cudampi__CPUHOSTTODEVICEREQASYNC 38
-#define __cudampi__HOSTTODEVICEASYNCRESP 39
-#define __cudampi__CPUDEVICETOHOSTREQASYNC 40
-#define __cudampi__DEVICETOHOSTASYNCRESP 41
-#define __cudampi__DEVICETOHOSTDATA 42
-#define __cudampi__HOSTTODEVICEDATA 43
+#define __cudampi__CPUDEVICETOHOSTREQASYNC 39
+#define __cudampi__CPUSTREAMCREATEREQ 40
+#define __cudampi__CPUSTREAMCREATERESP 41
+#define __cudampi__CPUSTREAMDESTROYREQ 42
+#define __cudampi__CPUSTREAMDESTROYRESP 43
 #define __cudampi__CUDAMPIFINALIZE 100
+#define MIN_ASYNC_MSG_TAG 101 
+#define D_MSG_TAG 2
+#define MAX_ASYNC_MSG_TAG 32000 // According to MPI spec tag upper bound is guaranteed to be no less than 32767 (https://www.mpi-forum.org/docs/mpi-4.1/mpi41-report.pdf page 36, chapter 3.2.3)
+#define CPU_STREAMS_SUPPORTED 2
