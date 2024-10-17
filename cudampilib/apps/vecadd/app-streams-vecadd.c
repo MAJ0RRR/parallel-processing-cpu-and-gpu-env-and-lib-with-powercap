@@ -227,7 +227,7 @@ int main(int argc, char **argv)
         }
 
         privatecounter++;
-        if (privatecounter % 2 == 0) 
+        if (privatecounter % 30 == 0) 
         {
             // Timing the synchronization block
             gettimeofday(&sync_start, NULL);
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
 
     __cudampi__deviceSynchronize();
     __cudampi__streamDestroy(stream1);
-    if (streamcount == 30)
+    if (streamcount == 2)
     {
         __cudampi__streamDestroy(stream2);
     }

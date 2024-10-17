@@ -28,7 +28,10 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
     #pragma omp parallel for num_threads(num_threads)
     for (long my_index = 0; my_index < num_elements; my_index++) 
     {
-        devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+        for(int i =0; i<1000; i++)
+        {
+            devPtrc[my_index] = devPtra[my_index] / 200 + devPtrb[my_index] / 300;
+        }
     }
 }
 
