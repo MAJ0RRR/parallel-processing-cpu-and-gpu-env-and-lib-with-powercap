@@ -97,6 +97,7 @@ int main(int argc, char **argv)
     void *devPtra, *devPtrc;
     void *devPtra2, *devPtrc2;
     int i;
+    int counterrr = 0;
     cudaStream_t stream1;
     cudaStream_t stream2;
     int mythreadid = omp_get_thread_num();
@@ -133,6 +134,7 @@ int main(int argc, char **argv)
     do 
     {
       mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+      counterrr += 1;
 
       if (mycounter >= VECTORSIZE) 
       {
@@ -149,6 +151,7 @@ int main(int argc, char **argv)
         if (streamcount == 2) 
         {
           mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+      counterrr += 1;
 
           if (mycounter >= VECTORSIZE) 
           {
@@ -179,6 +182,7 @@ int main(int argc, char **argv)
     {
       __cudampi__cudaStreamDestroy(stream2);
     }
+    log_message(LOG_ERROR, "thread%d = %d", omp_get_thread_num(), counterrr);
   }
   gettimeofday(&stop, NULL);
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
