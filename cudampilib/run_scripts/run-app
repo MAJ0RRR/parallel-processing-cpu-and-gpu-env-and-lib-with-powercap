@@ -44,7 +44,7 @@ elif [ $2 == "D" ]; then
     echo "Running locally with application '$APP_NAME'..."
 
     mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
---mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+--mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile ./debughostfile
 -np 1 ./$BUILD_DIR/app-streams-$APP_NAME $STREAMS_COUNT $POWER_CAP \
@@ -101,7 +101,7 @@ elif [ "$MODE" == "C" ]; then
     echo "Running remotly with application '$APP_NAME'..."
 
     mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
---mca btl_tcp_if_exclude docker0,docker_gwbridge,lo \
+--mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile \"$TEMP_HOSTFILE\" \
 -np 1 ./$BUILD_DIR/app-streams-$APP_NAME $STREAMS_COUNT $POWER_CAP \
