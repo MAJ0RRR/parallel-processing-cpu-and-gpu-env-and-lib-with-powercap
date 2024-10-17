@@ -90,8 +90,19 @@ int main(int argc, char **argv)
 
   gettimeofday(&start, NULL);
 
-  #pragma omp parallel num_threads(alldevicescount)
-  {
+#pragma omp parallel num_threads(alldevicescount)
+{
+    struct timeval start_p, stop_p;
+    struct timeval alloc_start, alloc_end;
+    struct timeval index_start, index_end;
+    struct timeval memcpy_start, memcpy_end;
+    struct timeval kernel_start, kernel_end;
+    struct timeval sync_start, sync_end;
+    double time_alloc = 0.0;
+    double time_index = 0.0;
+    double time_memcpy = 0.0;
+    double time_kernel = 0.0;
+    double time_sync = 0.0;
     long long mycounter;
     int finish = 0;
     void *devPtra, *devPtrc;
@@ -104,8 +115,16 @@ int main(int argc, char **argv)
     void *devPtr;
     void *devPtr2;
     long long privatecounter = 0;
+
     __cudampi__setDevice(mythreadid);
+
     #pragma omp barrier
+
+    gettimeofday(&start_p, NULL);
+
+    // Timing the memory allocation block
+    gettimeofday(&alloc_start, NULL);
+
     __cudampi__malloc(&devPtra, batchsize * sizeof(double));
     __cudampi__malloc(&devPtrc, batchsize * sizeof(double));
 
@@ -113,77 +132,144 @@ int main(int argc, char **argv)
 
     if(streamcount == 2)
     {
-    __cudampi__malloc(&devPtra2, batchsize * sizeof(double));
-    __cudampi__malloc(&devPtrc2, batchsize * sizeof(double));
+        __cudampi__malloc(&devPtra2, batchsize * sizeof(double));
+        __cudampi__malloc(&devPtrc2, batchsize * sizeof(double));
 
-    __cudampi__malloc(&devPtr2, 2 * sizeof(void *));
+        __cudampi__malloc(&devPtr2, 2 * sizeof(void *));
     }
 
+    gettimeofday(&alloc_end, NULL);
+    time_alloc = (alloc_end.tv_sec - alloc_start.tv_sec) + ((alloc_end.tv_usec - alloc_start.tv_usec)/1e6);
 
     __cudampi__streamCreate(&stream1);
     if (streamcount == 2)
     {
-    __cudampi__streamCreate(&stream2);
-    __cudampi__memcpyAsync(devPtr2, &devPtra2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
-    __cudampi__memcpyAsync(devPtr2 + sizeof(void *), &devPtrc2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
+        __cudampi__streamCreate(&stream2);
+
+        // Timing memcpy operations for devPtr2
+        gettimeofday(&memcpy_start, NULL);
+        __cudampi__memcpyAsync(devPtr2, &devPtra2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
+        __cudampi__memcpyAsync(devPtr2 + sizeof(void *), &devPtrc2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
+        gettimeofday(&memcpy_end, NULL);
+        time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
     }
+
+    // Timing memcpy operations for devPtr
+    gettimeofday(&memcpy_start, NULL);
     __cudampi__memcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice, stream1);
     __cudampi__memcpyAsync(devPtr + sizeof(void *), &devPtrc, sizeof(void *), cudaMemcpyHostToDevice, stream1);
-
+    gettimeofday(&memcpy_end, NULL);
+    time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
 
     do 
     {
-      mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
-      counterrr += 1;
+        // Timing the index fetching block
+        gettimeofday(&index_start, NULL);
+        mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+        counterrr += 1;
+        gettimeofday(&index_end, NULL);
+        time_index += (index_end.tv_sec - index_start.tv_sec) + ((index_end.tv_usec - index_start.tv_usec)/1e6);
 
-      if (mycounter >= VECTORSIZE) 
-      {
-        finish = 1;
-      }
-      else 
-      {
-        __cudampi__memcpyAsync(devPtra, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream1);
-
-        __cudampi__kernelInStream(devPtr, stream1);
-
-        __cudampi__memcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream1);
-
-        if (streamcount == 2) 
+        if (mycounter >= VECTORSIZE) 
         {
-          mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
-      counterrr += 1;
-
-          if (mycounter >= VECTORSIZE) 
-          {
             finish = 1;
-          } 
-          else 
-          {
-            __cudampi__memcpyAsync(devPtra2, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream2);
-
-            __cudampi__kernelInStream(devPtr2, stream2);
-
-            __cudampi__memcpyAsync(vectorc + mycounter, devPtrc2, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream2);
-          }
         }
-      }
+        else 
+        {
+            // Timing memcpy operations
+            gettimeofday(&memcpy_start, NULL);
+            __cudampi__memcpyAsync(devPtra, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream1);
+            gettimeofday(&memcpy_end, NULL);
+            time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
 
-      privatecounter++;
-      if (privatecounter % 2) 
-      {
-        __cudampi__deviceSynchronize();
-      }
+            // Timing kernel launch
+            gettimeofday(&kernel_start, NULL);
+            __cudampi__kernelInStream(devPtr, stream1);
+            gettimeofday(&kernel_end, NULL);
+            time_kernel += (kernel_end.tv_sec - kernel_start.tv_sec) + ((kernel_end.tv_usec - kernel_start.tv_usec)/1e6);
+
+            // Timing memcpy operations for result copy
+            gettimeofday(&memcpy_start, NULL);
+            __cudampi__memcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream1);
+            gettimeofday(&memcpy_end, NULL);
+            time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
+
+            if (streamcount == 2) 
+            {
+                // Timing the index fetching block for the second stream
+                gettimeofday(&index_start, NULL);
+                mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+                counterrr += 1;
+                gettimeofday(&index_end, NULL);
+                time_index += (index_end.tv_sec - index_start.tv_sec) + ((index_end.tv_usec - index_start.tv_usec)/1e6);
+
+                if (mycounter >= VECTORSIZE) 
+                {
+                    finish = 1;
+                } 
+                else 
+                {
+                    // Timing memcpy operations
+                    gettimeofday(&memcpy_start, NULL);
+                    __cudampi__memcpyAsync(devPtra2, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream2);
+                    gettimeofday(&memcpy_end, NULL);
+                    time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
+
+                    // Timing kernel launch
+                    gettimeofday(&kernel_start, NULL);
+                    __cudampi__kernelInStream(devPtr2, stream2);
+                    gettimeofday(&kernel_end, NULL);
+                    time_kernel += (kernel_end.tv_sec - kernel_start.tv_sec) + ((kernel_end.tv_usec - kernel_start.tv_usec)/1e6);
+
+                    // Timing memcpy operations for result copy
+                    gettimeofday(&memcpy_start, NULL);
+                    __cudampi__memcpyAsync(vectorc + mycounter, devPtrc2, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream2);
+                    gettimeofday(&memcpy_end, NULL);
+                    time_memcpy += (memcpy_end.tv_sec - memcpy_start.tv_sec) + ((memcpy_end.tv_usec - memcpy_start.tv_usec)/1e6);
+                }
+            }
+        }
+
+        privatecounter++;
+        if (privatecounter % 2) 
+        {
+            // Timing synchronization
+            gettimeofday(&sync_start, NULL);
+            __cudampi__deviceSynchronize();
+            gettimeofday(&sync_end, NULL);
+            time_sync += (sync_end.tv_sec - sync_start.tv_sec) + ((sync_end.tv_usec - sync_start.tv_usec)/1e6);
+        }
 
     } while (!finish);
 
+    // Final synchronization
+    gettimeofday(&sync_start, NULL);
     __cudampi__deviceSynchronize();
-    __cudampi__cudaStreamDestroy(stream1);
+    gettimeofday(&sync_end, NULL);
+    time_sync += (sync_end.tv_sec - sync_start.tv_sec) + ((sync_end.tv_usec - sync_start.tv_usec)/1e6);
+
+    gettimeofday(&stop_p, NULL);
+    double total_time = (double)(stop_p.tv_sec - start_p.tv_sec) + ((double)(stop_p.tv_usec - start_p.tv_usec) / 1e6);
+
+    // Calculating average times per iteration
+    double avg_time_alloc = time_alloc / counterrr;
+    double avg_time_index = time_index / counterrr;
+    double avg_time_memcpy = time_memcpy / counterrr;
+    double avg_time_kernel = time_kernel / counterrr;
+    double avg_time_sync = time_sync / counterrr;
+
+    // Printing the measured times for each block
+    log_message(LOG_INFO, "Thread %d: Allocation time=%f s, Index fetching time=%f s, Memcpy time=%f s, Kernel launch time=%f s, Synchronization time=%f s, Overall time=%f s, Counter=%d\n", 
+        omp_get_thread_num(), avg_time_alloc, avg_time_index, avg_time_memcpy, avg_time_kernel, avg_time_sync, total_time, counterrr);
+
+    __cudampi__streamDestroy(stream1);
     if(streamcount == 2)
     {
-      __cudampi__cudaStreamDestroy(stream2);
+        __cudampi__streamDestroy(stream2);
     }
-    log_message(LOG_ERROR, "thread%d = %d", omp_get_thread_num(), counterrr);
-  }
+}
+
+
   gettimeofday(&stop, NULL);
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 

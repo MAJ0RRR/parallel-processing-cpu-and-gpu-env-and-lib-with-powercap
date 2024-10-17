@@ -243,7 +243,7 @@ int main(int argc, char **argv)
 
     // Printing the measured times for each block
     log_message(LOG_INFO, "Thread %d: Allocation time=%f s, Index fetching time=%f s, Memcpy time=%f s, Kernel launch time=%f s, Synchronization time=%f s, Overall time=%f s, counter=%d\n", 
-        omp_get_thread_num(), time_alloc, time_index, time_memcpy, time_kernel, time_sync, total_time, counterrr);
+        omp_get_thread_num(), time_alloc/counterrr, time_index/counterrr, time_memcpy/counterrr, time_kernel/counterrr, time_sync/counterrr, total_time/counterrr, counterrr);
 
     __cudampi__deviceSynchronize();
     __cudampi__streamDestroy(stream1);
