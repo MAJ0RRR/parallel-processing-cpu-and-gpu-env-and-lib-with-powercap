@@ -30,7 +30,18 @@ __global__ void appkernel(void *devPtr)
   double *devPtrc = (double *)(((void **)devPtr)[2]);
 
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-  devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+  for (int i = 0; i < 100; i ++)
+  {
+    if (i % 2 == 0)
+    {
+      devPtrc[my_index] += 1;
+    }
+    else
+    {
+      devPtrc[my_index] -= 1;
+    }
+    devPtrc[my_index] += devPtra[my_index] / 2 + devPtrb[my_index] / 3;
+  }
 }
 
 extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
