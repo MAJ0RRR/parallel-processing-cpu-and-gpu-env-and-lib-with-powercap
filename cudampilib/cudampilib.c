@@ -952,23 +952,19 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 
   } else if (kind == cudaMemcpyDeviceToHost) {
 
-    size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t);
+    size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t) + sizeof(int);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = (void *)src;
     *((unsigned long *)(sdata + sizeof(void *))) = count; // how many bytes we want to get from a GPU
     *((cudaStream_t *)(sdata + sizeof(void *) + sizeof(unsigned long))) = stream;
+    *((int *)(sdata + sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t))) = counter;
+
+    initiateAsyncRecv(dst, count, counter);
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ, __cudampi__currentCommunicator);
 
-    size_t rsize = sizeof(cudaError_t) + count;
-    unsigned char rdata[rsize];
-
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTASYNCRESP, __cudampi__currentCommunicator, NULL);
-
-    memcpy(dst, rdata + sizeof(cudaError_t), count);
-
-    return ((cudaError_t)rdata);
+    return cudaSuccess;
   }
 }
 
