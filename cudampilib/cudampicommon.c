@@ -10,6 +10,12 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #include "cudampicommon.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
 
 float computeDevPerformance(struct timeval period) {
   // period is just the time between two events so compute performance as an inverse
@@ -18,18 +24,52 @@ float computeDevPerformance(struct timeval period) {
 }
 
 float getGPUpower(int gpuid) {
-
   char buffer[500];
-  char filename[100];
-  float power;
+  char filename[150];
+  float power = 0.0;
 
-  sprintf(filename, "/tmp/__cudampi__gpu_power.%d", gpuid);
+  // Get home directory and create alternate directory for storing the power file
+  const char *home = getenv("HOME");
+  if (home == NULL) {
+      fprintf(stderr, "Error: Could not determine home directory\n");
+      return -1;
+  }
+
+  // Create the mytmp directory in home if it doesn't exist
+  char mytmp_dir[200];
+  sprintf(mytmp_dir, "%s/mytmp", home);
+
+  // Check if the directory exists, if not create it
+  struct stat st = {0};
+  if (stat(mytmp_dir, &st) == -1) {
+      if (mkdir(mytmp_dir, 0700) != 0) {
+          fprintf(stderr, "Error: Could not create directory %s: %s\n", mytmp_dir, strerror(errno));
+          return -1;
+      }
+  }
+
+  sprintf(filename, "%s/__cudampi__gpu_power.%d", mytmp_dir, gpuid);
+
   sprintf(buffer, "nvidia-smi -q -i %d -d POWER | grep \"Power Draw\" | tr -s ' ' | cut -d ' ' -f 5 > %s", gpuid, filename);
 
-  system(buffer);
+  int ret = system(buffer);
+  if (ret != 0) {
+      fprintf(stderr, "Error: Failed to execute nvidia-smi command for GPU %d\n", gpuid);
+      return -1;
+  }
 
   FILE *fp = fopen(filename, "r");
-  fscanf(fp, "%f", &power);
+  if (fp == NULL) {
+      fprintf(stderr, "Error: Could not open file %s\n", filename);
+      return -1;
+  }
+
+  if (fscanf(fp, "%f", &power) != 1) {
+      fprintf(stderr, "Error: Failed to read power value for GPU %d\n", gpuid);
+      fclose(fp);
+      return -1;
+  }
+
   fclose(fp);
 
   return power;
