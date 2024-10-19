@@ -174,10 +174,10 @@ int main(int argc, char **argv)
     } while (!finish);
 
     __cudampi__deviceSynchronize();
-    __cudampi__cudaStreamDestroy(stream1);
+    __cudampi__streamDestroy(stream1);
     if(streamcount == 2)
     {
-      __cudampi__cudaStreamDestroy(stream2);
+      __cudampi__streamDestroy(stream2);
     }
   }
   gettimeofday(&stop, NULL);
