@@ -27,6 +27,8 @@ int debugTaskCounter = 0;
 
 float lastEnergyMeasured = 0.0;
 
+float totalCPUEnergyMeasured = 0.0;
+
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
@@ -506,7 +508,7 @@ int main(int argc, char **argv) {
         cpuSynchronize();
 
         if (measurepower) {
-          error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
+          error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalCPUEnergyMeasured);
         }
 
         if (error != cudaSuccess) {
@@ -752,7 +754,7 @@ int main(int argc, char **argv) {
             // This variable is unused since we just need to initialize lastEnergyMeasured and don't care about actual value
             float cpuEnergyMeasured;
             isInitialCpuEnergyMeasured = 1;
-            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured);
+            getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured, &totalCPUEnergyMeasured);
           }
           omp_unset_lock(&cpuEnergyLock);
         }
@@ -919,4 +921,6 @@ else
     omp_destroy_lock(&synchronize_locks[i]);
     omp_destroy_lock(&task_available_locks[i]);
   }
+
+  log_message(LOG_DEBUG, "Total CPU energy: %d \n", totalCPUEnergyMeasured);
 }

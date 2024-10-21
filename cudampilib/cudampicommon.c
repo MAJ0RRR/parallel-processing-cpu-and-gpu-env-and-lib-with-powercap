@@ -83,7 +83,7 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   return status;
 }
 
- cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
+ cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed) {
   // compute energy used from last energy measurement and update the variable
 
   FILE *file;
@@ -109,6 +109,8 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   *energyUsed = energy_joules - *lastEnergyMeasured;
 
   *lastEnergyMeasured = energy_joules;
+
+  *totalEnergyUsed += energy_joules;
 
   return cudaSuccess;
 }
