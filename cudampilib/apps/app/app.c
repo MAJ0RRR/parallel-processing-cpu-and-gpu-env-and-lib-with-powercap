@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
   int cudadevicescount = 1;
 
-  __cudampi__cudaGetDeviceCount(&cudadevicescount);
+  __cudampi__getDeviceCount(&cudadevicescount);
 
   #pragma omp parallel num_threads(cudadevicescount)
   {
@@ -36,15 +36,15 @@ int main(int argc, char **argv) {
       tab[i] = i;
     }
 
-    __cudampi__cudaSetDevice(mythreadid);
+    __cudampi__setDevice(mythreadid);
 
-    __cudampi__cudaMalloc(&devPtr, 4096);
+    __cudampi__malloc(&devPtr, 4096);
 
-    __cudampi__cudaMemcpy(devPtr, tab, 2048, cudaMemcpyHostToDevice);
+    __cudampi__memcpy(devPtr, tab, 2048, cudaMemcpyHostToDevice);
 
-    __cudampi__cudaKernel(devPtr);
+    __cudampi__kernel(devPtr);
 
-    __cudampi__cudaMemcpy(tab + 2048, devPtr, 2048, cudaMemcpyDeviceToHost);
+    __cudampi__memcpy(tab + 2048, devPtr, 2048, cudaMemcpyDeviceToHost);
 
     __cudampi__deviceSynchronize();
 
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
       printf("\n ind[%d]=%d", i, (int)(tab[i]));
     }
 
-    __cudampi__cudaFree(devPtr);
+    __cudampi__free(devPtr);
   }
 
   __cudampi__terminateMPI();
