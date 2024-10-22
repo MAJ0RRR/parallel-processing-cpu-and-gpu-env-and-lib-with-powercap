@@ -68,6 +68,18 @@ int scheduledTasksInStream[ALL_CPU_STREAMS];
 omp_lock_t cpuEnergyLock;
 int isInitialCpuEnergyMeasured = 0;
 
+
+struct timeval memcpy_start_d2h, memcpy_end_d2h;
+struct timeval alloc_start_d2h, alloc_end_d2h;
+struct timeval free_start_d2h, free_end_d2h;
+struct timeval copy_start_d2h, copy_end_d2h;
+struct timeval memcpy_start_h2d, memcpy_end_h2d;
+struct timeval alloc_start_h2d, alloc_end_h2d;
+struct timeval free_start_h2d, free_end_h2d;
+struct timeval copy_start_h2d, copy_end_h2d;
+double time_memcpy_d2h = 0.0;
+double time_memcpy_h2d = 0.0;
+
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
 void launchcpukernel(void *devPtr, int thread_count);
@@ -985,8 +997,7 @@ int main(int argc, char **argv) {
         unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) ));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ in stream %d\n", stream);
         allocateCpuTaskInStream(cpuLaunchKernelTask, *((void **)rdata), stream);
-        
-        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
+
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {

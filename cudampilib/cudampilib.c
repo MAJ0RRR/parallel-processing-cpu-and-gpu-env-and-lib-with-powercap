@@ -1062,8 +1062,6 @@ void __cudampi__cpuKernelInStream(void *devPtr, cudaStream_t stream){
   *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
 
   MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELREQ, __cudampi__currentCommunicator);
-
-  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
 }
 
 void __cudampi__cpuKernel(void *devPtr) {
