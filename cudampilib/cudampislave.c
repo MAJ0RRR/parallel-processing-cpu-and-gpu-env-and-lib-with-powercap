@@ -78,7 +78,13 @@ struct timeval alloc_start_h2d, alloc_end_h2d;
 struct timeval free_start_h2d, free_end_h2d;
 struct timeval copy_start_h2d, copy_end_h2d;
 double time_memcpy_d2h = 0.0;
+double time_alloc_d2h = 0.0;
+double time_copy_d2h = 0.0;
+double time_free_d2h = 0.0;
 double time_memcpy_h2d = 0.0;
+double time_alloc_h2d = 0.0;
+double time_copy_h2d = 0.0;
+double time_free_h2d = 0.0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
