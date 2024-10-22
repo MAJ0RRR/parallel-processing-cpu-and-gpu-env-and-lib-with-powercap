@@ -207,7 +207,7 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
-  save_vector_output_char(vectorc, VECTORSIZE, "patternsearch_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
+  save_vector_output_char(vectorc, VECTORSIZE, "patternsearch_logs_gpu.log", "GPU");
 
   cudaFreeHost(vectora);
   cudaFreeHost(vectorc);
