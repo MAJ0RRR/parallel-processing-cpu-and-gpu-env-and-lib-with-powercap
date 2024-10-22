@@ -100,19 +100,64 @@ int main(int argc, char **argv)
     #pragma omp barrier
     
     __cudampi__malloc(&devPtra, batchsize * sizeof(double));
+    if (!devPtra) 
+    {
+      log_message(LOG_ERROR, "\nNot enough memory.");
+      exit(0);
+    }
     __cudampi__malloc(&devPtrb, batchsize * sizeof(double));
+
+    if (!devPtrb) 
+    {
+      log_message(LOG_ERROR, "\nNot enough memory.");
+      exit(0);
+    }
+
     __cudampi__malloc(&devPtrc, batchsize * sizeof(double));
+    if (!devPtrc) 
+    {
+      log_message(LOG_ERROR, "\nNot enough memory.");
+      exit(0);
+    }
 
     __cudampi__malloc(&devPtr, 3 * sizeof(void *));
+    if (!devPtr) 
+    {
+      log_message(LOG_ERROR, "\nNot enough memory.");
+      exit(0);
+    }
 
     if(streamcount == 2)
     {
       __cudampi__malloc(&devPtra2, batchsize * sizeof(double));
+      if (!devPtra2) 
+      {
+        log_message(LOG_ERROR, "\nNot enough memory.");
+        exit(0);
+      }
+
       __cudampi__malloc(&devPtrb2, batchsize * sizeof(double));
+      if (!devPtrb2) 
+      {
+        log_message(LOG_ERROR, "\nNot enough memory.");
+        exit(0);
+      }
+
       __cudampi__malloc(&devPtrc2, batchsize * sizeof(double));
+      if (!devPtrc2) 
+      {
+        log_message(LOG_ERROR, "\nNot enough memory.");
+        exit(0);
+      }
 
       __cudampi__malloc(&devPtr2, 3 * sizeof(void *));
+      if (!devPtr2) 
+      {
+        log_message(LOG_ERROR, "\nNot enough memory.");
+        exit(0);
+      }
     }
+    
     __cudampi__streamCreate(&stream1);
     __cudampi__memcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice, stream1);
     __cudampi__memcpyAsync(devPtr + sizeof(void *), &devPtrb, sizeof(void *), cudaMemcpyHostToDevice, stream1);
@@ -179,16 +224,15 @@ int main(int argc, char **argv)
       __cudampi__free(devPtrb2);
       __cudampi__free(devPtrc2);
     }
-
-    cudaFreeHost(vectora);
-    cudaFreeHost(vectorb);
-    cudaFreeHost(vectorc);
   }
 
   gettimeofday(&stop, NULL);
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
+  cudaFreeHost(vectora);
+  cudaFreeHost(vectorb);
+  cudaFreeHost(vectorc);
 
   gettimeofday(&stoptotal, NULL);
   log_message(LOG_INFO, "Total elapsed time=%f\n", (double)((stoptotal.tv_sec - starttotal.tv_sec) + (double)(stoptotal.tv_usec - starttotal.tv_usec) / 1000000.0));
