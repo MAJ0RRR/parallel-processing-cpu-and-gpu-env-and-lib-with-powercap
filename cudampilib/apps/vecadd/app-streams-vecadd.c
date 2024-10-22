@@ -18,8 +18,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_LOGGING
 #include "logger.h"
 #include "vecadd_defines.h"
+#include "utility.h"
 
-#define VECTORSIZE VECADD_VECTOR_SIZE
+long long VECTORSIZE = VECADD_VECTOR_SIZE;
 
 double *vectora;
 double *vectorb;
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
         exit(0);
       }
     }
-    
+
     __cudampi__streamCreate(&stream1);
     __cudampi__memcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice, stream1);
     __cudampi__memcpyAsync(devPtr + sizeof(void *), &devPtrb, sizeof(void *), cudaMemcpyHostToDevice, stream1);
@@ -230,6 +231,8 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
+  save_vector_output_double(vectorc, VECTORSIZE, "vecadd_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
+
   cudaFreeHost(vectora);
   cudaFreeHost(vectorb);
   cudaFreeHost(vectorc);

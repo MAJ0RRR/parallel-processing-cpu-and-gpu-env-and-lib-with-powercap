@@ -19,17 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_LOGGING
 #include "logger.h"
 #include "collatz_defines.h"
-
-void print_double_array(double* start, int batchsize, const char* filename, const char* header) {
-    FILE *file = fopen(filename, "w");
-    fprintf(file, "%s\n", header);
-     fprintf(file, "Array of size %d:\n", batchsize);
-    for (int i = 0; i < batchsize; i++) {
-        fprintf(file, "%f\n", start[i]);
-    }
-    fclose(file);
-}
-
+#include "utility.h"
 
 long long VECTORSIZE = COLLATZ_VECTORSIZE;
 
@@ -214,7 +204,7 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
-  print_double_array(vectorc, VECTORSIZE, "logs_cpugpuasyncfull.txt", "CPUGPUASYNC");
+  save_vector_output_double(vectorc, VECTORSIZE, "collatz_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
 
   cudaFreeHost(vectora);
   cudaFreeHost(vectorc);
