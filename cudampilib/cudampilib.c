@@ -159,7 +159,7 @@ void process_queue() {
         item = TAILQ_FIRST(__cudampi__currentMemcpyQueue);
 
         // Wait for the request data to be received / sent
-        if (&item->dataRequest != NULL) {
+        if (item->dataRequest != NULL) {
           MPI_Wait(&item->dataRequest, &status);
         }
         MPI_Wait(&item->statusRequest, &status);
@@ -762,7 +762,6 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       // decode and store power consumption for the device
 
       energy = *((float *)(rdata + sizeof(cudaError_t)));
-      process_queue();
     }
     else
     {
@@ -776,6 +775,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
       power = *((float *)(rdata + sizeof(cudaError_t)));
     }
+    process_queue();
 
     retVal = ((cudaError_t)rdata);
   }
