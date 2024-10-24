@@ -16,7 +16,7 @@ void save_vector_output_double(double* start, int batchsize, const char* filenam
     char fullpath[256];
     snprintf(fullpath, sizeof(fullpath), "logs/%s", filename);
 
-    FILE *file = fopen(filename, "w");
+    FILE *file = fopen(fullpath, "w");
     fprintf(file, "%s\n", header);
      fprintf(file, "Array of size %d:\n", batchsize);
     for (int i = 0; i < batchsize; i++) {
@@ -34,7 +34,7 @@ void save_vector_output_char(char* start, int batchsize, const char* filename, c
     char fullpath[256];
     snprintf(fullpath, sizeof(fullpath), "logs/%s", filename);
 
-    FILE *file = fopen(filename, "w");
+    FILE *file = fopen(fullpath, "w");
     fprintf(file, "%s\n", header);
      fprintf(file, "Array of size %d:\n", batchsize);
     for (int i = 0; i < batchsize; i++) {
