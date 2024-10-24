@@ -985,8 +985,6 @@ int main(int argc, char **argv) {
         unsigned long stream = *((unsigned long*)(rdata + sizeof(void*) ));
         log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ in stream %d\n", stream);
         allocateCpuTaskInStream(cpuLaunchKernelTask, *((void **)rdata), stream);
-        
-        MPI_Send(NULL, 0, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
@@ -1002,12 +1000,6 @@ int main(int argc, char **argv) {
         cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *)));
 
         launchkernelinstream(devPtr, stream);
-
-        size_t ssize = sizeof(cudaError_t);
-        unsigned char sdata[ssize];
-        *((cudaError_t *)sdata) = cudaSuccess;
-
-        MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISTREAMCREATEREQ) {

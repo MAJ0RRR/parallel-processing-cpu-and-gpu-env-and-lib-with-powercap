@@ -1021,11 +1021,7 @@ void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
     *((void **)sdata) = devPtr;
     *((unsigned long *)(sdata + sizeof(void *))) = (unsigned long)stream;
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__currentCommunicator);
-
-    int rsize = sizeof(cudaError_t);
-    unsigned char rdata[rsize];
-
-    MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHKERNELINSTREAMRESP, __cudampi__currentCommunicator, NULL);
+    // No need to wait for response since all kernels return void
   }
 }
 
@@ -1062,8 +1058,7 @@ void __cudampi__cpuKernelInStream(void *devPtr, cudaStream_t stream){
   *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
 
   MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELREQ, __cudampi__currentCommunicator);
-
-  MPI_Recv(NULL, 0, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELRESP, __cudampi__currentCommunicator, NULL);
+  // No need to wait for response since all kernels return void
 }
 
 void __cudampi__cpuKernel(void *devPtr) {
