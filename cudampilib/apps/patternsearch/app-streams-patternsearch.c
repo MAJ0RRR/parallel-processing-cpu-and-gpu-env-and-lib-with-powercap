@@ -63,14 +63,14 @@ int main(int argc, char **argv)
   if (!vectora) 
   {
     log_message(LOG_ERROR, "\nNot enough memory.");
-    exit(0);
+    exit(-1);
   }
 
   cudaHostAlloc((void **)&vectorc, sizeof(char) * VECTORSIZE, cudaHostAllocDefault);
   if (!vectorc) 
   {
     log_message(LOG_ERROR, "\nNot enough memory.");
-    exit(0);
+    exit(-1);
   }
 
   // Filling input
@@ -102,21 +102,21 @@ int main(int argc, char **argv)
     if (!devPtra) 
     {
       log_message(LOG_ERROR, "\nNot enough memory.");
-      exit(0);
+      exit(-1);
     }
 
     __cudampi__malloc(&devPtrc, batchsize * sizeof(char));
     if (!devPtrc) 
     {
       log_message(LOG_ERROR, "\nNot enough memory.");
-      exit(0);
+      exit(-1);
     }
 
     __cudampi__malloc(&devPtr, 2 * sizeof(void *));
     if (!devPtr) 
     {
       log_message(LOG_ERROR, "\nNot enough memory.");
-      exit(0);
+      exit(-1);
     }
 
     if(streamcount == 2)
@@ -125,21 +125,21 @@ int main(int argc, char **argv)
       if (!devPtra2) 
       {
         log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(0);
+        exit(-1);
       }
 
       __cudampi__malloc(&devPtrc2, batchsize * sizeof(char));
       if (!devPtrc2) 
       {
         log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(0);
+        exit(-1);
       }
 
       __cudampi__malloc(&devPtr2, 2 * sizeof(void *));
       if (!devPtr2) 
       {
         log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(0);
+        exit(-1);
       }
     }
 
