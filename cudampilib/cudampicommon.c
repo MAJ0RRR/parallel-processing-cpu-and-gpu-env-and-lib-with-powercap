@@ -19,18 +19,18 @@ float computeDevPerformance(struct timeval period) {
 
 float getGPUpower(int gpuid) {
 
-  char buffer[500];
-  char filename[100];
-  float power;
+  // char buffer[500];
+  // char filename[100];
+  // float power;
 
-  sprintf(filename, "/tmp/__cudampi__gpu_power.%d", gpuid);
-  sprintf(buffer, "nvidia-smi -q -i %d -d POWER | grep \"Power Draw\" | tr -s ' ' | cut -d ' ' -f 5 > %s", gpuid, filename);
+  // sprintf(filename, "/tmp/__cudampi__gpu_power.%d", gpuid);
+  // sprintf(buffer, "nvidia-smi -q -i %d -d POWER | grep \"Power Draw\" | tr -s ' ' | cut -d ' ' -f 5 > %s", gpuid, filename);
 
-  system(buffer);
+  // system(buffer);
 
-  FILE *fp = fopen(filename, "r");
-  fscanf(fp, "%f", &power);
-  fclose(fp);
+  // FILE *fp = fopen(filename, "r");
+  // fscanf(fp, "%f", &power);
+  // fclose(fp);
 
-  return power;
+  // return power;
 }
