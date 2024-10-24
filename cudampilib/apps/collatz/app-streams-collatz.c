@@ -15,6 +15,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdlib.h>
 
 #include <sys/time.h>
+#include "utility.h"
 
 long long VECTORSIZE = 200000000;
 
@@ -156,6 +157,8 @@ int main(int argc, char **argv) {
   fflush(stdout);
 
   __cudampi__terminateMPI();
+  save_vector_output_double(vectorc, VECTORSIZE, "collatz_logs_gpu.log", "GPU");
+
 
   gettimeofday(&stoptotal, NULL);
   printf("Total elapsed time=%f\n", (double)((stoptotal.tv_sec - starttotal.tv_sec) + (double)(stoptotal.tv_usec - starttotal.tv_usec) / 1000000.0));
