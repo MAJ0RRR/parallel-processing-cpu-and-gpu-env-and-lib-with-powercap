@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef ENABLE_OUTPUT_LOGS
 void save_vector_output_double(double* start, int batchsize, const char* filename, const char* header) {
     struct stat st = {0};
     if (stat("logs", &st) == -1) {
@@ -42,5 +43,9 @@ void save_vector_output_char(char* start, int batchsize, const char* filename, c
     }
     fclose(file);
 }
+#else
+void save_vector_output_double(double* start, int batchsize, const char* filename, const char* header) { }
+void save_vector_output_char(char* start, int batchsize, const char* filename, const char* header) { }
+#endif
 
 #endif // UTILITY_H

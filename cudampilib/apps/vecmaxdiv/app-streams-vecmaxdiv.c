@@ -19,6 +19,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_LOGGING
 #include "logger.h"
 #include "vecmaxdiv_defines.h"
+
+#define ENABLE_OUTPUT_LOGS
 #include "utility.h"
 
 long long VECTORSIZE = VECMAXDIV_VECTORSIZE;
