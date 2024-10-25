@@ -17,6 +17,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+#include "logger_gpu.h"
+#define ENABLE_LOGGING_GPU
+
 __global__ void appkernel(unsigned char *devPtr) {
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -31,7 +34,7 @@ extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) {
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>((unsigned char *)devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
-    printf("Error during kernel launch in stream");
+    log_message_gpu(LOG_ERROR_GPU, "Error during kernel launch in stream");
   }
 }
 
