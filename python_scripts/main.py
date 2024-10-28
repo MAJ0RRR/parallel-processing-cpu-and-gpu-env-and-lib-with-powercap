@@ -1,5 +1,5 @@
-from experiments.run_experiment import run_experiment
-from cudampi_dataclasses import RunParameters
+from experiments import run_experiment
+from models import RunParameters, ExperimentResult
 
 
 if __name__ == "__main__":
@@ -12,5 +12,6 @@ if __name__ == "__main__":
         problem_size=0,
     )
     experiment_result = run_experiment("DES lab 3 nodes",run_parameters, 1)
-    experiment_result.to_file("test")
+    experiment_result.to_file("test.json")
+    a = ExperimentResult.from_file("test.json")
     

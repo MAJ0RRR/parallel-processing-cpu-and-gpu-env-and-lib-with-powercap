@@ -4,7 +4,7 @@ import sys
 
 from pathlib import Path
 
-from cudampi_dataclasses import RunParameters, SingleRunResult
+from models import RunParameters, SingleRunResult, ExperimentResult
 
 MODE = "C 13 14 15" # "C {idx_in_hostfile_1} {idx_in_hostfile_2} ... {idx_in_hostfile_n}" (e.g. "C 1 7 13")
 
@@ -19,3 +19,14 @@ def run_app(run_parameters: RunParameters) -> SingleRunResult:
         print("Error Output:\n", e.output)
         sys.exit()
     return SingleRunResult.from_output(stdout=result.stdout, stderr=result.stderr)
+
+
+def run_experiment(description: str, run_parameters: RunParameters, numer_of_runs: int) -> ExperimentResult:
+    run_results = []
+    for _ in range(numer_of_runs):
+        run_results.append(run_app(run_parameters))
+    return ExperimentResult(
+        description=description,
+        parameters=run_parameters,
+        runs=run_results,
+    )
