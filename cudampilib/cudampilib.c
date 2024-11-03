@@ -9,6 +9,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+#include <argp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +31,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
 #define __cudampi__currentMemcpyQueue &(__cudampi__memcpy_queues[omp_get_thread_num()])
 
-
+struct __cudampi__arguments_type __cudampi__arguments;
 int *__cudampi__GPUcountspernode;
 int *__cudampi__CPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
@@ -70,6 +71,45 @@ int __cudampi__isglobalpowerlimitset = 0; // whether a global power limit has be
 float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+
+
+static char doc[] = "Cudampi program";
+static char args_doc[] = "";
+static struct argp_option options[] = {
+  { "cpu-enabled",       'c', "ENABLED", 0, "Enable CPU processing (1 to enable, 0 to disable)" },
+  { "number-of-streams", 'n', "NUM",     0, "Set the number of streams" },
+  { "batch-size",        'b', "SIZE",    0, "Set the batch size" },
+  { "powercap",          'p', "WATTS",   0, "Set the power cap (0 to disable)" },
+  { "problem-size",      's', "SIZE",    0, "Set the problem size" },
+  { 0 }
+};
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+  struct __cudampi__arguments_type *arguments = state->input;
+
+  switch (key)
+    {
+    case 'c':
+      arguments->cpu_enabled = atoi(arg);
+      break;
+    case 'n':
+      arguments->number_of_streams = atoi(arg);
+      break;
+    case 'b':
+      arguments->batch_size = atoi(arg);
+      break;
+    case 'p':
+      arguments->powercap = atoi(arg);
+      break;
+    case 's':
+      arguments->problem_size = atoll(arg);
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+    }
+  return 0;
+}
+static struct argp argp = { options, parse_opt, args_doc, doc };
 
 // Counter that holds a unique tag for asynchronously exchanged messages
 // it increments by 2 (D_MSG_TAG) to accomodate data message and status
@@ -412,6 +452,23 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     fflush(stdout);
     exit(-1);
   }
+
+  /* Default values */
+  __cudampi__arguments.cpu_enabled = 1;
+  __cudampi__arguments.number_of_streams = 1;
+  __cudampi__arguments.batch_size = 50000;
+  __cudampi__arguments.powercap = 0;
+  __cudampi__arguments.problem_size = 200000000;
+
+  /* Parse our arguments; every option seen by parse_opt will be reflected in arguments. */
+  argp_parse(&argp, argc, argv, 0, 0, &__cudampi__arguments);
+
+  /* Print parsed arguments using log_message with LOG_INFO level */
+  log_message(LOG_INFO, "CPU Enabled       : %d", __cudampi__arguments.cpu_enabled);
+  log_message(LOG_INFO, "Number of Streams : %d", __cudampi__arguments.number_of_streams);
+  log_message(LOG_INFO, "Batch Size        : %d", __cudampi__arguments.batch_size);
+  log_message(LOG_INFO, "Power Cap         : %d", __cudampi__arguments.powercap);
+  log_message(LOG_INFO, "Problem Size      : %lld", __cudampi__arguments.problem_size);
 
   // fetch information about the rank and number of processes
 
