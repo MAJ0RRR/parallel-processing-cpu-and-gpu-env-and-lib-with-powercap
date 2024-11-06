@@ -12,6 +12,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/queue.h>
+#include <nvml.h> // NVIDIA Management Library for GPU monitoring
 
 #include "cudampi.h"
 #include "cudampicommon.h"
@@ -33,6 +34,11 @@ int terminated = 0;
 int debugTaskCounter = 0;
 
 float lastEnergyMeasured = 0.0;
+float lastGpuEnergyMeasured  = 0.0;
+
+float energyUsed = 0.0;
+
+float totalGPUEnergyMeasured = 0.0;
 
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
@@ -66,7 +72,9 @@ omp_lock_t synchronize_locks[ALL_CPU_STREAMS];
 
 int scheduledTasksInStream[ALL_CPU_STREAMS];
 omp_lock_t cpuEnergyLock;
+omp_lock_t gpuEnergyLock;
 int isInitialCpuEnergyMeasured = 0;
+int isInitialGpuEnergyMeasured = 0;
 
 void launchkernel(void *devPtr);
 void launchkernelinstream(void *devPtr, cudaStream_t stream);
@@ -429,6 +437,22 @@ void cpuTaskLauncher(unsigned long stream)
 }
 
 int main(int argc, char **argv) {
+  nvmlReturn_t nvmlResult;
+  nvmlDevice_t device;
+
+  nvmlResult = nvmlInit();
+  if (nvmlResult != NVML_SUCCESS) {
+      fprintf(stderr, "Failed to initialize NVML: %s\n", nvmlErrorString(nvmlResult));
+      return -1;
+  }
+
+  // Get device handle
+  nvmlResult = nvmlDeviceGetHandleByIndex(0, &device); // Assumes GPU 0, adjust if needed
+  if (nvmlResult != NVML_SUCCESS) {
+      fprintf(stderr, "Failed to get device handle: %s\n", nvmlErrorString(nvmlResult));
+      nvmlShutdown();
+      return -1;
+  }
 
   // basically this is a slave process that waits for requests and redirects
   // those to local GPU(s)
@@ -648,6 +672,7 @@ int main(int argc, char **argv) {
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
 
         int measurepower;
+        cudaError_t error = cudaErrorUnknown;
 
         MPI_Recv(&measurepower, 1, MPI_INT, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
@@ -665,12 +690,19 @@ int main(int argc, char **argv) {
         omp_set_lock(&synchronize_locks[CPU_STREAM_FOR_GPU_RESPONSES]);
         // Free the lock back
         omp_unset_lock(&synchronize_locks[CPU_STREAM_FOR_GPU_RESPONSES]);
-  
-        *((cudaError_t *)sdata) = e;
 
-        *((float *)(sdata + sizeof(cudaError_t))) = (measurepower ? getGPUpower(device) : -1); // -1 if not measured
+        if (measurepower) {
+            error = getGpuEnergyUsed(&lastGPUEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalGPUEnergyMeasured);
+        }
+
+        if (error != cudaSuccess) {
+            *((float *)(sdata + sizeof(cudaError_t))) = -1;
+        }
+
+        *((cudaError_t *)sdata) = error;
 
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
+        log_message(LOG_DEBUG, "Synchronized GPU device\n");
         updateGlobalGpuMemcpyBuffer(&gpuMemcpyBuffer);
       }
 
@@ -699,7 +731,7 @@ int main(int argc, char **argv) {
         *((cudaError_t *)sdata) = error;
 
         
-        log_message(LOG_DEBUG, "Synchronized CPU device\n");
+        log_message(LOG_DEBUG, "Synchronized CPU and measured GPU device\n");
         MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
       }
 
@@ -947,6 +979,21 @@ int main(int argc, char **argv) {
         // in this case in the message there is a serialized pointer
 
         int rsize = sizeof(void *);
+
+        if (!isInitialGpuEnergyMeasured)
+        {
+            // Initialize GPU energy value
+            omp_set_lock(&gpuEnergyLock);
+            if (!isInitialGpuEnergyMeasured)
+            {
+                // This variable is unused since we just need to initialize lastGpuEnergyMeasured and don't care about actual value
+                float gpuEnergyMeasured;
+                isInitialGpuEnergyMeasured = 1;
+                getGpuEnergyUsed(&lastGpuEnergyMeasured, &gpuEnergyMeasured, &totalGPUEnergyMeasured);
+            }
+            omp_unset_lock(&gpuEnergyLock);
+        }
+
         unsigned char rdata[rsize];
 
         MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -1125,6 +1172,7 @@ else
 }
 }
   MPI_Finalize();
+  shutdown_nvml(); // Shutdown NVML at the end
   
   for (int i = 0; i < ALL_CPU_STREAMS; i++)
   {
@@ -1132,4 +1180,6 @@ else
     omp_destroy_lock(&synchronize_locks[i]);
     omp_destroy_lock(&task_available_locks[i]);
   }
+
+  log_message(LOG_DEBUG, "Total GPU energy: %d \n", totalGPUEnergyMeasured);
 }
