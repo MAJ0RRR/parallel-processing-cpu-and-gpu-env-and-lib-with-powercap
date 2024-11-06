@@ -29,7 +29,7 @@ double *vectora;
 double *vectorb;
 double *vectorc;
 
-int batchsize = VECMAXDIV_BATCH_SIZE;
+int batchsize;
 
 long long globalcounter = 0;
 
@@ -46,6 +46,7 @@ int main(int argc, char **argv)
   __cudampi__initializeMPI(argc, argv);
 
   streamcount = __cudampi__arguments.number_of_streams;
+  batchsize = __cudampi__arguments.batch_size;
 
   int alldevicescount = 0;
 
