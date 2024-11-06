@@ -45,19 +45,10 @@ int main(int argc, char **argv)
 
   __cudampi__initializeMPI(argc, argv);
 
+  streamcount = __cudampi__arguments.number_of_streams;
+
   int alldevicescount = 0;
 
-  if (argc > 1) 
-  {
-    streamcount = atoi(argv[1]);
-  }
-
-  if (argc > 2) 
-  {
-    powerlimit = atof(argv[2]);
-    log_message(LOG_INFO,"\nSetting power limit=%f\n", powerlimit);
-    __cudampi__setglobalpowerlimit(powerlimit);
-  }
   __cudampi__getDeviceCount(&alldevicescount);
 
   cudaHostAlloc((void **)&vectora, sizeof(double) * VECTORSIZE, cudaHostAllocDefault);

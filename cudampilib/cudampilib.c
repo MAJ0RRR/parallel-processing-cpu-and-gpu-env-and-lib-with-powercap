@@ -31,7 +31,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define  __cudampi_isLocalGpu __cudampi__currentDevice < __cudampi__GPUcountspernode[0]
 #define __cudampi__currentMemcpyQueue &(__cudampi__memcpy_queues[omp_get_thread_num()])
 
-struct __cudampi__arguments_type __cudampi__arguments;
 int *__cudampi__GPUcountspernode;
 int *__cudampi__CPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
