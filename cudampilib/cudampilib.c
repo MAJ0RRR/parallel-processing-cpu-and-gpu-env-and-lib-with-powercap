@@ -219,6 +219,7 @@ void __cudampi__setglobalpowerlimit(float powerlimit) {
   __cudampi__globalpowerlimit = powerlimit;
 }
 
+
 float __cudampi__gettotalpowerofselecteddevices() { // gets total power of currently enabled devices
   int i;
   float power = 0;
@@ -470,6 +471,12 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   log_message(LOG_INFO, "Power Cap         : %d", __cudampi__arguments.powercap);
   log_message(LOG_INFO, "Problem Size      : %lld", __cudampi__arguments.problem_size);
 
+  if (__cudampi__arguments.powercap > 0) {
+    log_message(LOG_INFO, "\nSetting power limit=%f\n", __cudampi__arguments.powercap);
+    __cudampi__setglobalpowerlimit(__cudampi__arguments.powercap);
+  }
+
+
   // fetch information about the rank and number of processes
 
   MPI_Comm_size(MPI_COMM_WORLD, &__cudampi__MPIproccount);
@@ -504,6 +511,13 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__localFreeThreadCount = 0;
 
   MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
+
+  if (!__cudampi__arguments.cpu_enabled){
+    for (int i=0; i < __cudampi__MPIproccount; i++){
+      __cudampi__freeThreadsPerNode[i] = 0;
+    }
+  }
+
 
   // check if there is a configuration file
   FILE *filep = fopen("__cudampi.conf", "r");
