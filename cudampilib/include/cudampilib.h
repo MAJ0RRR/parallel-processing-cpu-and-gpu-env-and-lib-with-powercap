@@ -24,7 +24,7 @@ struct __cudampi__arguments_type
   int batch_size;
   int powercap; // 0 means disabled
   long long problem_size;
-}__cudampi__arguments;
+};
 
 void __cudampi__setglobalpowerlimit(float powerlimit);
 int __cudampi__selectdevicesforpowerlimit_greedy();

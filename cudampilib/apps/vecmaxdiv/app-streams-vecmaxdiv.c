@@ -23,6 +23,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_OUTPUT_LOGS
 #include "utility.h"
 
+
+struct __cudampi__arguments_type __cudampi__arguments;
+
 long long VECTORSIZE = VECMAXDIV_VECTORSIZE;
 
 double *vectora;

@@ -71,6 +71,8 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
+int __cudampi__batch_size;
+extern struct __cudampi__arguments_type __cudampi__arguments;
 
 static char doc[] = "Cudampi program";
 static char args_doc[] = "";
@@ -503,6 +505,9 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     fflush(stdout);
     exit(-1);
   }
+
+  __cudampi__batch_size = __cudampi__arguments.batch_size;
+  MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -1077,12 +1082,12 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
   }
 }
 
-void launchkernelinstream(void *devPtr, cudaStream_t stream);
+void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream);
 
 void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
 
   if (__cudampi_isLocalGpu) { // run locally
-    launchkernelinstream(devPtr, stream);
+    launchkernelinstream(devPtr, __cudampi__batch_size, stream);
   } else { // launch remotely
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long);
