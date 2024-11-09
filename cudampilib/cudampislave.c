@@ -681,18 +681,20 @@ int main(int argc, char **argv) {
         size_t ssize = sizeof(cudaError_t) + sizeof(float);
         unsigned char sdata[ssize];
 
-        int device;
-        cudaGetDevice(&device);
-  
-        cudaError_t e = cudaDeviceSynchronize();
+        error = cudaDeviceSynchronize();
+        if (error != cudaSuccess) {
+          log_message(LOG_ERROR, "cudaDeviceSynchronize failed with error: %d", error);
+        }
         
         // Synchronize async memcpy tasks
         omp_set_lock(&synchronize_locks[CPU_STREAM_FOR_GPU_RESPONSES]);
         // Free the lock back
         omp_unset_lock(&synchronize_locks[CPU_STREAM_FOR_GPU_RESPONSES]);
 
-        if (measurepower) {
-            error = getGpuEnergyUsed(&lastGPUEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalGPUEnergyMeasured);
+        measurepower = 1; // For testing purpose
+
+        if (measurepower && error == cudaSuccess) {
+            error = getGpuEnergyUsed(device, &lastGpuEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalGPUEnergyMeasured);
         }
 
         if (error != cudaSuccess) {
@@ -989,7 +991,7 @@ int main(int argc, char **argv) {
                 // This variable is unused since we just need to initialize lastGpuEnergyMeasured and don't care about actual value
                 float gpuEnergyMeasured;
                 isInitialGpuEnergyMeasured = 1;
-                getGpuEnergyUsed(&lastGpuEnergyMeasured, &gpuEnergyMeasured, &totalGPUEnergyMeasured);
+                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, &totalGPUEnergyMeasured);
             }
             omp_unset_lock(&gpuEnergyLock);
         }
@@ -1172,7 +1174,13 @@ else
 }
 }
   MPI_Finalize();
-  shutdown_nvml(); // Shutdown NVML at the end
+
+  nvmlResult = nvmlShutdown();  // Shutdown NVML at the end
+  if (NVML_SUCCESS != nvmlResult) {
+      log_message(LOG_ERROR,"Error while closing NVML: %s\n", nvmlErrorString(nvmlResult));
+      return 1;
+  }
+  log_message(LOG_ERROR,"NVML works fine.\n"); 
   
   for (int i = 0; i < ALL_CPU_STREAMS; i++)
   {
@@ -1181,5 +1189,5 @@ else
     omp_destroy_lock(&task_available_locks[i]);
   }
 
-  log_message(LOG_DEBUG, "Total GPU energy: %d \n", totalGPUEnergyMeasured);
+  log_message(LOG_INFO, "Total GPU energy: %f\n", (double)totalGPUEnergyMeasured / 1.0);
 }
