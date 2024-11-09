@@ -6,12 +6,11 @@ from pathlib import Path
 
 from models import RunParameters, SingleRunResult, ExperimentResult
 
-MODE = "C 13 14 15" # "C {idx_in_hostfile_1} {idx_in_hostfile_2} ... {idx_in_hostfile_n}" (e.g. "C 1 7 13")
 
 def run_app(run_parameters: RunParameters) -> SingleRunResult:
     os.chdir(Path.home() / Path("parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib"))
-    arguments = f"A {run_parameters.number_of_streams} {run_parameters.powercap if run_parameters.powercap else ''}"
-    command = f"./run_scripts/run-app {run_parameters.app_name} {MODE} {arguments}"
+    arguments = f"{run_parameters.number_of_streams} {run_parameters.powercap if run_parameters.powercap else ''}"
+    command = f"./run_scripts/run-app {run_parameters.app_name} B {run_parameters.number_od_nodes} {arguments}"
     try:
         result = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
     except subprocess.CalledProcessError as e:
@@ -30,3 +29,6 @@ def run_experiment(description: str, run_parameters: RunParameters, numer_of_run
         parameters=run_parameters,
         runs=run_results,
     )
+
+def run_experiments():
+    pass

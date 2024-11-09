@@ -18,6 +18,7 @@ class RunParameters:
     app_name: str
     cpu_enabled: bool
     number_of_streams: int
+    number_od_nodes: int
     batch_size: int
     powercap: int | None
     problem_size: int
