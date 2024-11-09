@@ -1,5 +1,0 @@
-#!/bin/bash
-
-BUILD_DIR="build"
-
-mpirun -np 1 ./$BUILD_DIR/app-streams-collatz $2 $3 : -np $1 ./$BUILD_DIR/cudampislave-collatz

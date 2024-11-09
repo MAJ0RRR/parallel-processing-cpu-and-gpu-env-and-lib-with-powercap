@@ -16,6 +16,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <nvml.h> // NVIDIA Management Library for GPU monitoring
+
+#define ENABLE_LOGGING
+#include "logger.h"
 
 float computeDevPerformance(struct timeval period) {
   // period is just the time between two events so compute performance as an inverse
@@ -113,4 +117,30 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   *totalEnergyUsed += energy_joules;
 
   return cudaSuccess;
+}
+
+cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed) {
+    // checks power consumption since last measurement and updates variables
+
+    nvmlReturn_t result;
+    unsigned int power_mw;
+    float power_watts, energy_joules;
+
+    result = nvmlDeviceGetPowerUsage(device, &power_mw);
+    if (result != NVML_SUCCESS) {
+        fprintf(stderr, "Failed to get power usage: %s\n", nvmlErrorString(result));
+        return cudaErrorUnknown;
+    }
+
+    power_watts = (float)power_mw / 1000.0f;
+
+    energy_joules = power_watts;
+
+    *energyUsed = energy_joules - *lastEnergyMeasured;
+
+    *lastEnergyMeasured = energy_joules;
+
+    *totalEnergyUsed += energy_joules;
+
+    return cudaSuccess;
 }
