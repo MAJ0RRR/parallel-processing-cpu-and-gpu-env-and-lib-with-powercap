@@ -1,5 +1,6 @@
 import os
 import json
+import statistics
 import re
 
 from dataclasses import dataclass, asdict, fields
@@ -50,6 +51,18 @@ class SingleRunResult:
 class MultipleRunResult:
     parameters: RunParameters
     runs: list[SingleRunResult]
+
+    def min(self, single_run_result_property: str):
+        return min([getattr(run, single_run_result_property) for run in self.runs])
+
+    def max(self, single_run_result_property: str):
+        return max([getattr(run, single_run_result_property) for run in self.runs])
+
+    def average(self, single_run_result_property: str):
+        return statistics.mean([getattr(run, single_run_result_property) for run in self.runs])
+
+    def standard_deviation(self, single_run_result_property: str):
+        return statistics.stdev([getattr(run, single_run_result_property) for run in self.runs])
 
 
 @dataclass
