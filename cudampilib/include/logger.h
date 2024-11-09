@@ -17,7 +17,7 @@ static const char* LOG_LEVEL_NAMES[] = {
 };
 
 #ifdef ENABLE_LOGGING
-    #define LOG_LEVEL_THRESHOLD LOG_WARN   // All logs enabled expect DEBUG
+    #define LOG_LEVEL_THRESHOLD LOG_INFO   // All logs enabled expect DEBUG
 #endif
 
 #ifdef ENABLE_LOGGING // All logs expect DEBUG in stdout
