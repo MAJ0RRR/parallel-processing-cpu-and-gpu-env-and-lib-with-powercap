@@ -47,18 +47,29 @@ class SingleRunResult:
     
 
 @dataclass
-class ExperimentResult:
-    description: str
+class MultipleRunResult:
     parameters: RunParameters
     runs: list[SingleRunResult]
-    
+
+
+@dataclass
+class ExperimentResult:
+    description: str
+    experiment_result: list[MultipleRunResult]
+
     def to_file(self, file_path: str | os.PathLike):
         with open(file_path, "w") as file:
-            json.dump(asdict(self), file, indent=4)
+            file.write(json.dumps(asdict(self), indent=4))
 
     @classmethod
-    def from_file(cls, file_path: str | os.PathLike) -> "ExperimentResult":
+    def from_file(cls, file_path: str | os.PathLike) -> "Experiment":
         with open(file_path, "r") as file:
             data = json.load(file)
         return dataclass_from_dict(cls, data)
+
+
+@dataclass
+class Experiment:
+    description: str
+    experiment_configurations: list[RunParameters]
     

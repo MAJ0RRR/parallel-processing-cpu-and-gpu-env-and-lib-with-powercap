@@ -4,10 +4,10 @@ import sys
 
 from pathlib import Path
 
-from models import RunParameters, SingleRunResult, ExperimentResult
+from models import RunParameters, SingleRunResult, MultipleRunResult, ExperimentResult, Experiment
 
 
-def run_app(run_parameters: RunParameters) -> SingleRunResult:
+def single_app_run(run_parameters: RunParameters) -> SingleRunResult:
     os.chdir(Path.home() / Path("parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib"))
     arguments = f"{run_parameters.number_of_streams} {run_parameters.powercap if run_parameters.powercap else ''}"
     command = f"./run_scripts/run-app {run_parameters.app_name} B {run_parameters.number_od_nodes} {arguments}"
@@ -20,15 +20,22 @@ def run_app(run_parameters: RunParameters) -> SingleRunResult:
     return SingleRunResult.from_output(stdout=result.stdout, stderr=result.stderr)
 
 
-def run_experiment(description: str, run_parameters: RunParameters, numer_of_runs: int) -> ExperimentResult:
+def multiple_app_runs(run_parameters: RunParameters, numer_of_runs: int) -> MultipleRunResult:
     run_results = []
     for _ in range(numer_of_runs):
-        run_results.append(run_app(run_parameters))
-    return ExperimentResult(
-        description=description,
+        run_results.append(single_app_run(run_parameters))
+    return MultipleRunResult(
         parameters=run_parameters,
         runs=run_results,
     )
 
-def run_experiments():
-    pass
+def run_experiment(experiment_file_name: str, experiment: Experiment, number_of_runs: int):
+    experiment_result = ExperimentResult(
+        description=experiment.description,
+        experiment_result=[],
+    )
+
+    for experiment_configuration in experiment.experiment_configurations:
+        experiment_result.experiment_result.append(multiple_app_runs(run_parameters=experiment_configuration, numer_of_runs=number_of_runs))
+    
+    experiment_result.to_file(file_path=experiment_file_name)
