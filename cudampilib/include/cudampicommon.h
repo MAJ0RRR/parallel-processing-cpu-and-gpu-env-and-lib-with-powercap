@@ -14,6 +14,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <cuda_runtime.h>
 #include <omp.h>
 #include <string.h>
+#include <nvml.h>
 
 float computeDevPerformance(struct timeval period);
 
