@@ -507,6 +507,8 @@ int main(int argc, char **argv) {
 
         cpuSynchronize();
 
+        // measurepower = 1
+
         if (measurepower) {
           error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalCPUEnergyMeasured);
         }
@@ -922,5 +924,5 @@ else
     omp_destroy_lock(&task_available_locks[i]);
   }
 
-  log_message(LOG_DEBUG, "Total CPU energy: %d \n", totalCPUEnergyMeasured);
+  log_message(LOG_INFO, "Total CPU energy: %d \n", totalCPUEnergyMeasured);
 }
