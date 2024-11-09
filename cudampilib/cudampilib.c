@@ -72,6 +72,7 @@ float __cudampi__globalpowerlimit;
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 int __cudampi__batch_size;
+int __cudampi__cpu_enabled;
 extern struct __cudampi__arguments_type __cudampi__arguments;
 
 static char doc[] = "Cudampi program";
@@ -507,7 +508,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   __cudampi__batch_size = __cudampi__arguments.batch_size;
+  __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
   MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -515,13 +519,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__localFreeThreadCount = 0;
 
   MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
-
-  if (!__cudampi__arguments.cpu_enabled){
-    for (int i=0; i < __cudampi__MPIproccount; i++){
-      __cudampi__freeThreadsPerNode[i] = 0;
-    }
-  }
-
 
   // check if there is a configuration file
   FILE *filep = fopen("__cudampi.conf", "r");

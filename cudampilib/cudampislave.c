@@ -45,6 +45,7 @@ int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
 int __cudampi__batch_size;
+int __cudampi__cpu_enabled;
 
 unsigned long cpuStreamsValid[CPU_STREAMS_SUPPORTED];
 
@@ -483,16 +484,22 @@ int main(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
-    log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
-    exit(-1);
+  MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (__cudampi__cpu_enabled){
+      if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
+      log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
+      exit(-1);
+    }
+  }
+  else {
+    __cudampi__localFreeThreadCount = 0;
   }
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
   MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
-
-  MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
