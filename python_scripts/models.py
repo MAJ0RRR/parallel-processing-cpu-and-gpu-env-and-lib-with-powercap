@@ -8,9 +8,21 @@ from dataclasses import dataclass, asdict, fields
 
 def dataclass_from_dict(klass, d):
     try:
-        fieldtypes = {f.name:f.type for f in fields(klass)}
-        return klass(**{f:dataclass_from_dict(fieldtypes[f],d[f]) for f in d})
-    except:
+        fieldtypes = {f.name: f.type for f in fields(klass)}
+        init_values = {}
+        for field_name, field_type in fieldtypes.items():
+            if isinstance(d[field_name], list):
+                init_values[field_name] = [
+                    dataclass_from_dict(field_type.__args__[0], item) if hasattr(field_type, '__args__') else item
+                    for item in d[field_name]
+                ]
+            elif hasattr(field_type, '__dataclass_fields__'):
+                init_values[field_name] = dataclass_from_dict(field_type, d[field_name])
+            else:
+                init_values[field_name] = d[field_name]
+        return klass(**init_values)
+    except Exception as e:
+        print(f"Error while creating dataclass from dict: {e}")
         return d
     
 
@@ -75,7 +87,7 @@ class ExperimentResult:
             file.write(json.dumps(asdict(self), indent=4))
 
     @classmethod
-    def from_file(cls, file_path: str | os.PathLike) -> "Experiment":
+    def from_file(cls, file_path: str | os.PathLike) -> "ExperimentResult":
         with open(file_path, "r") as file:
             data = json.load(file)
         return dataclass_from_dict(cls, data)
