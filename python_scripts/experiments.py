@@ -7,9 +7,17 @@ from pathlib import Path
 from models import RunParameters, SingleRunResult, MultipleRunResult, ExperimentResult, Experiment
 
 
+def get_arguments(run_parameters: RunParameters):
+    cpu_enabled_arg = "1" if run_parameters.cpu_enabled else "0"
+    number_of_streams_arg = str(run_parameters.number_of_streams)
+    batch_size_arg = str(run_parameters.batch_size)
+    powercap_arg = str(run_parameters.powercap) if run_parameters.powercap else "0"
+    problem_size_arg = str(run_parameters.problem_size)
+    return f"--cpu-enabled={cpu_enabled_arg} --number-of-streams={number_of_streams_arg} --batch-size={batch_size_arg} --powercap={powercap_arg} --problem-size={problem_size_arg}"
+
 def single_app_run(run_parameters: RunParameters) -> SingleRunResult:
     os.chdir(Path.home() / Path("parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib"))
-    arguments = f"{run_parameters.number_of_streams} {run_parameters.powercap if run_parameters.powercap else ''}"
+    arguments = get_arguments(run_parameters=run_parameters)
     command = f"./run_scripts/run-app {run_parameters.app_name} B {run_parameters.number_od_nodes} {arguments}"
     try:
         result = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
