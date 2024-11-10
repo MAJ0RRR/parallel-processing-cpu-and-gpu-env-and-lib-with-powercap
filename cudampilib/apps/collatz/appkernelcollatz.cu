@@ -57,12 +57,12 @@ __global__ void appkernel(void *devPtr)
   devPtrc[my_index] = counter;
 }
 
-extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream) 
+extern "C" void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream) 
 {
   dim3 blocksingrid(COLLATZ_BLOCKS_IN_GRID);
-  dim3 threadsinblock(COLLATZ_THREADS_IN_BLOCK);
+  dim3 threadsinblock(batchSize / COLLATZ_BLOCKS_IN_GRID);
 
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, COLLATZ_THREADS_IN_BLOCK);
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, batchSize / COLLATZ_BLOCKS_IN_GRID);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
@@ -70,4 +70,4 @@ extern "C" void launchkernelinstream(void *devPtr, cudaStream_t stream)
   }
 }
 
-extern "C" void launchkernel(void *devPtr) { launchkernelinstream(devPtr, 0); }
+extern "C" void launchkernel(void *devPtr, int batchSize) { launchkernelinstream(devPtr, batchSize, 0); }

@@ -44,6 +44,9 @@ int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
+int __cudampi__batch_size;
+int __cudampi__cpu_enabled;
+
 unsigned long cpuStreamsValid[CPU_STREAMS_SUPPORTED];
 
 typedef struct task_queue_entry {
@@ -69,8 +72,8 @@ omp_lock_t cpuEnergyLock;
 int isInitialCpuEnergyMeasured = 0;
 
 void launchkernel(void *devPtr);
-void launchkernelinstream(void *devPtr, cudaStream_t stream);
-void launchcpukernel(void *devPtr, int thread_count);
+void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream);
+void launchcpukernel(void *devPtr, int batchSize, int thread_count);
 
 typedef struct {
   unsigned char* buffer;
@@ -289,7 +292,7 @@ void logGpuMemcpyError(cudaError_t e, int tag) {
 
 void cpuLaunchKernelTask(void* arg) {
   // kernel just takes void*
-  launchcpukernel(arg, __cudampi__localFreeThreadCount - 1);
+  launchcpukernel(arg, __cudampi__batch_size ,__cudampi__localFreeThreadCount - 1);
 }
 
 void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long stream)
@@ -481,9 +484,17 @@ int main(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
-    log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
-    exit(-1);
+  MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (__cudampi__cpu_enabled){
+      if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
+      log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
+      exit(-1);
+    }
+  }
+  else {
+    __cudampi__localFreeThreadCount = 0;
   }
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
@@ -999,7 +1010,7 @@ int main(int argc, char **argv) {
         void *devPtr = *((void **)rdata);
         cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *)));
 
-        launchkernelinstream(devPtr, stream);
+        launchkernelinstream(devPtr, __cudampi__batch_size, stream);
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISTREAMCREATEREQ) {

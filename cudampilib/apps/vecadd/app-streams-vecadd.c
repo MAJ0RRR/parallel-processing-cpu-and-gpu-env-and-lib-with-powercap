@@ -22,13 +22,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_OUTPUT_LOGS
 #include "utility.h"
 
-long long VECTORSIZE = VECADD_VECTOR_SIZE;
+struct __cudampi__arguments_type __cudampi__arguments;
+
+long long VECTORSIZE;
 
 double *vectora;
 double *vectorb;
 double *vectorc;
 
-int batchsize = VECADD_BATCH_SIZE;
+int batchsize;
 
 long long globalcounter = 0;
 
@@ -44,19 +46,11 @@ int main(int argc, char **argv)
 
   __cudampi__initializeMPI(argc, argv);
 
+  streamcount = __cudampi__arguments.number_of_streams;
+  batchsize = __cudampi__arguments.batch_size;
+  VECTORSIZE = __cudampi__arguments.problem_size;
+
   int alldevicescount = 0;
-
-  if (argc > 1) 
-  {
-    streamcount = atoi(argv[1]);
-  }
-
-  if (argc > 2) 
-  {
-    powerlimit = atof(argv[2]);
-    log_message(LOG_INFO, "\nSetting power limit=%f\n", powerlimit);
-    __cudampi__setglobalpowerlimit(powerlimit);
-  }
 
   __cudampi__getDeviceCount(&alldevicescount);
 

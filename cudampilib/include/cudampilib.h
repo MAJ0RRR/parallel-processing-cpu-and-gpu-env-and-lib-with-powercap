@@ -17,6 +17,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 extern __global__ void kernel(long *devPtr);
 
+struct __cudampi__arguments_type
+{
+  int cpu_enabled;
+  int number_of_streams;
+  int batch_size;
+  int powercap; // 0 means disabled
+  long long problem_size;
+};
+
 void __cudampi__setglobalpowerlimit(float powerlimit);
 int __cudampi__selectdevicesforpowerlimit_greedy();
 
