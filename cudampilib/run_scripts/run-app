@@ -63,13 +63,18 @@ elif [ "$MODE" == "C" ]; then
     echo "Running on the following machines: ${selected_machines[*]}"
     echo "Running remotely with application '$APP_NAME'..."
 
+    # Base MPI command for the master process
     mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile \"$TEMP_HOSTFILE\" \
--np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@} \
-: -np $SLAVE_PROC_AMOUNT ./$BUILD_DIR/cudampislave-$APP_NAME"
-                  
+-np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@}"
+
+    # Conditionally add slave processes if SLAVE_PROC_AMOUNT > 0
+    if [ "$SLAVE_PROC_AMOUNT" -gt 0 ]; then
+        mpi_command+=" : -np $SLAVE_PROC_AMOUNT ./$BUILD_DIR/cudampislave-$APP_NAME"
+    fi
+
     echo "Command: $mpi_command"
     echo "====================================="
     eval "$mpi_command"
@@ -88,13 +93,18 @@ elif [ "$MODE" == "B" ]; then
 
     head -n "$MACHINES_COUNT" "$HOSTFILE" > "$TEMP_HOSTFILE"
 
+    # Base MPI command for the master process
     mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile \"$TEMP_HOSTFILE\" \
--np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@:4} \
-: -np $SLAVE_PROC_AMOUNT ./$BUILD_DIR/cudampislave-$APP_NAME"
-                  
+-np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@:4}"
+
+    # Conditionally add slave processes if SLAVE_PROC_AMOUNT > 0
+    if [ "$SLAVE_PROC_AMOUNT" -gt 0 ]; then
+        mpi_command+=" : -np $SLAVE_PROC_AMOUNT ./$BUILD_DIR/cudampislave-$APP_NAME"
+    fi
+
     echo "Command: $mpi_command"
     echo "====================================="
     eval "$mpi_command"
