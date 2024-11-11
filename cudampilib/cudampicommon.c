@@ -140,7 +140,9 @@ cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, flo
 
     *lastEnergyMeasured = energy_joules;
 
-    *totalEnergyUsed += energy_joules;
+    if (totalEnergyUsed != NULL) {
+        *totalEnergyUsed += energy_joules;
+    }
 
     return cudaSuccess;
 }

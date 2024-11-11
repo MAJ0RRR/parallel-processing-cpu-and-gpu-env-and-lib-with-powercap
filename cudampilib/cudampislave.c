@@ -995,7 +995,7 @@ int main(int argc, char **argv) {
                 // This variable is unused since we just need to initialize lastGpuEnergyMeasured and don't care about actual value
                 float gpuEnergyMeasured;
                 isInitialGpuEnergyMeasured = 1;
-                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, &totalGPUEnergyMeasured);
+                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, NULL);
             }
             omp_unset_lock(&gpuEnergyLock);
         }
