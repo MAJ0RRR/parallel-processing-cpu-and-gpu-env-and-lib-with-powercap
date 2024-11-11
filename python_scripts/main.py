@@ -1,155 +1,107 @@
+import os
+import functools
+from itertools import chain
+
 from models import RunParameters, Experiment, ExperimentResult, MultipleRunResult, SingleRunResult
 from charts import time_powercap_scatter, time_batch_size_scatter, time_number_of_nodes_bar, time_number_of_nodes_scatter
 from experiments import run_experiment
 
 
-if __name__ == "__main__":
-    # experiments definitions
-    
-    # run experiments
-    #run_experiment(experiment_file_name="aaaaa", experiment=collatz1, number_of_runs=1)
-    
-    # draw charts
-    experiment_result = ExperimentResult(
-        description="aaaa",
-        experiment_result=[
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=True,
-                    number_of_streams=1,
-                    number_od_nodes=1,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=7,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=True,
-                    number_of_streams=2,
-                    number_od_nodes=1,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=5,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=False,
-                    number_of_streams=1,
-                    number_od_nodes=1,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=6,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=False,
-                    number_of_streams=2,
-                    number_od_nodes=1,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=4,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=True,
-                    number_of_streams=1,
-                    number_od_nodes=2,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=3,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=True,
-                    number_of_streams=2,
-                    number_od_nodes=2,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=5,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=False,
-                    number_of_streams=1,
-                    number_od_nodes=2,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=6,
-                        energy_used=0
-                    )
-                ]
-            ),
-            MultipleRunResult(
-                parameters=RunParameters(
-                    app_name="collatz",
-                    cpu_enabled=False,
-                    number_of_streams=2,
-                    number_od_nodes=2,
-                    batch_size=0,
-                    powercap=None,
-                    problem_size=0
-                ),
-                runs=[
-                    SingleRunResult(
-                        execution_duration=4,
-                        energy_used=0
-                    )
-                ]
-            ),
-        ]
+def experiment_time_nodes(description: str, app_name: str, file_path: str | os.PathLike):
+    common_run_parameters = functools.partial(
+        RunParameters,
+        app_name=app_name,
+        batch_size=50000,
+        powercap=None,
+        problem_size=20000000,
     )
-    time_number_of_nodes_bar(experiment_result=experiment_result)
-    
+    experiment = Experiment(
+        description=description,
+        experiment_configurations=list(
+            chain.from_iterable(
+                [
+                    [
+                        common_run_parameters(cpu_enabled=False, number_of_streams=1, number_od_nodes=i),
+                        common_run_parameters(cpu_enabled=True, number_of_streams=1, number_od_nodes=i),
+                        common_run_parameters(cpu_enabled=False, number_of_streams=2, number_od_nodes=i),
+                        common_run_parameters(cpu_enabled=True, number_of_streams=2, number_od_nodes=i),
+                    ]
+                for i in [2, 4, 8, 16]
+                ]
+            )
+        )
+    )
+    run_experiment(experiment_file_name=file_path, experiment=experiment, number_of_runs=1)
+
+def experiment_time_powercap(description: str, app_name: str, file_path: str | os.PathLike):
+    common_run_parameters = functools.partial(
+        RunParameters,
+        app_name=app_name,
+        batch_size=50000,
+        number_od_nodes=16,
+        number_of_streams=2,
+        problem_size=20000000,
+    )
+    experiment = Experiment(
+        description=description,
+        experiment_configurations=list(
+            chain.from_iterable(
+                [
+                    [
+                        common_run_parameters(cpu_enabled=True, powercap=powercap),
+                        common_run_parameters(cpu_enabled=False, powercap=powercap),
+                    ]
+                for powercap in range(300, 3001, 100)
+                ]
+            )
+        )
+    )
+    run_experiment(experiment_file_name=file_path, experiment=experiment, number_of_runs=1)
+
+
+def experiment_time_batch_size(description: str, app_name: str, file_path: str | os.PathLike):
+    common_run_parameters = functools.partial(
+        RunParameters,
+        app_name=app_name,
+        number_od_nodes=16,
+        number_of_streams=2,
+        problem_size=20000000,
+        powercap=None
+    )
+    experiment = Experiment(
+        description=description,
+        experiment_configurations=list(
+            chain.from_iterable(
+                [
+                    [
+                        common_run_parameters(cpu_enabled=True, batch_size=batch_size),
+                        common_run_parameters(cpu_enabled=False, batch_size=batch_size),
+                    ]
+                for batch_size in [10**i for i in [3,4,5]]
+                ]
+            )
+        )
+    )
+    run_experiment(experiment_file_name=file_path, experiment=experiment, number_of_runs=1)
+
+
+if __name__ == "__main__":
+    # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="collatz", file_path="collatz_time_nodes.json")
+    # experiment_time_powercap(description="time(powercap)", app_name="collatz", file_path="collatz_powercap_16_nodes.json")
+    # experiment_time_batch_size(description="time(batch_size)", app_name="collatz", file_path="collatz_batch_size_16_nodes.json")
+
+    # exp = ExperimentResult.from_file("../cudampilib/collatz_time_nodes.json")
+    # time_number_of_nodes_bar(exp)
+    # time_number_of_nodes_scatter(exp)
+    # exp = ExperimentResult.from_file("../cudampilib/collatz_powercap_16_nodes.json")
+    # time_powercap_scatter(exp)
+    # exp = ExperimentResult.from_file("../cudampilib/collatz_batch_size_16_nodes.json")
+    # time_batch_size_scatter(exp)
+
+    exp = ExperimentResult.from_file("../python_scripts/collatz_time_nodes.json")
+    time_number_of_nodes_bar(exp)
+    time_number_of_nodes_scatter(exp)
+    exp = ExperimentResult.from_file("../python_scripts/collatz_powercap_16_nodes.json")
+    time_powercap_scatter(exp)
+    exp = ExperimentResult.from_file("../python_scripts/collatz_batch_size_16_nodes.json")
+    time_batch_size_scatter(exp)
