@@ -1,111 +1,155 @@
-from models import RunParameters, Experiment, ExperimentResult
-from charts import time_batch_size_scatter
+from models import RunParameters, Experiment, ExperimentResult, MultipleRunResult, SingleRunResult
+from charts import time_powercap_scatter, time_batch_size_scatter, time_number_of_nodes_bar, time_number_of_nodes_scatter
 from experiments import run_experiment
 
 
 if __name__ == "__main__":
     # experiments definitions
-    # time(batch_size) GPU vs CPU+GPU 2 nodes
-    collatz1 = Experiment(
-        description="COLLATZ - time(batch_size) GPU vs CPU + GPU 2 nodes",
-        experiment_configurations=[
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=False,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=10,
-                powercap=None,
-                problem_size=100,
+    
+    # run experiments
+    #run_experiment(experiment_file_name="aaaaa", experiment=collatz1, number_of_runs=1)
+    
+    # draw charts
+    experiment_result = ExperimentResult(
+        description="aaaa",
+        experiment_result=[
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=True,
+                    number_of_streams=1,
+                    number_od_nodes=1,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=7,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=False,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=100,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=True,
+                    number_of_streams=2,
+                    number_od_nodes=1,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=5,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=False,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=1000,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=False,
+                    number_of_streams=1,
+                    number_od_nodes=1,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=6,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=False,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=10000,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=False,
+                    number_of_streams=2,
+                    number_od_nodes=1,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=4,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=False,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=100000,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=True,
+                    number_of_streams=1,
+                    number_od_nodes=2,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=3,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=True,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=10,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=True,
+                    number_of_streams=2,
+                    number_od_nodes=2,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=5,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=True,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=100,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=False,
+                    number_of_streams=1,
+                    number_od_nodes=2,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=6,
+                        energy_used=0
+                    )
+                ]
             ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=True,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=1000,
-                powercap=None,
-                problem_size=100,
-            ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=True,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=10000,
-                powercap=None,
-                problem_size=100,
-            ),
-            RunParameters(
-                app_name="collatz",
-                cpu_enabled=True,
-                number_of_streams=2,
-                number_od_nodes=2,
-                batch_size=100000,
-                powercap=None,
-                problem_size=100,
+            MultipleRunResult(
+                parameters=RunParameters(
+                    app_name="collatz",
+                    cpu_enabled=False,
+                    number_of_streams=2,
+                    number_od_nodes=2,
+                    batch_size=0,
+                    powercap=None,
+                    problem_size=0
+                ),
+                runs=[
+                    SingleRunResult(
+                        execution_duration=4,
+                        energy_used=0
+                    )
+                ]
             ),
         ]
     )
-    
-    # run experiments
-    # run_experiment(experiment_file_name="collatz1", experiment=collatz1, number_of_runs=2)
-    
-    # draw charts
-    experiment_result = ExperimentResult.from_file("/home/macierz/s184717/parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib/collatz1")
-    time_batch_size_scatter(experiment_result=experiment_result)
+    time_number_of_nodes_bar(experiment_result=experiment_result)
     

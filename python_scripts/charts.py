@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import pandas as pd
 from models import ExperimentResult
 
 
@@ -19,7 +20,7 @@ def time_powercap_scatter(experiment_result: ExperimentResult):
     plt.plot(power_gpu, execution_duration_gpu_min, label="GPU min", marker='o')
     plt.plot(power_cpu_gpu, execution_duration_cpu_gpu_max, label="CPU+GPU max", marker='o')
     plt.plot(power_gpu, execution_duration_gpu_max, label="GPU max", marker='o')
-    plt.xlabel("power cap")
+    plt.xlabel("powercap")
     plt.ylabel("time [s]")
     plt.legend()
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_power_cap_nodes_{experiment_result.experiment_result[0].parameters.number_od_nodes}.png')
@@ -40,8 +41,27 @@ def time_batch_size_scatter(experiment_result: ExperimentResult):
     plt.legend()
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_batch_size_nodes_{experiment_result.experiment_result[0].parameters.number_od_nodes}.png')
 
-def time_number_of_nodes_histogram():
-    pass
+def time_number_of_nodes_bar(experiment_result: ExperimentResult):
+    number_of_nodes = [multiple_run_result.parameters.number_od_nodes for multiple_run_result in experiment_result.experiment_result]
+    # "CPU+GPU one stream", "CPU+GPU two streams", "GPU one stream", "GPU two streams"
+    configuration = [f'{"CPU+" if multiple_run_result.parameters.cpu_enabled else ""}GPU {"one stream" if multiple_run_result.parameters.number_of_streams == 1 else "two streams"}' for multiple_run_result in experiment_result.experiment_result]
+    execution_duration = [multiple_run_result.average("execution_duration") for multiple_run_result in experiment_result.experiment_result]
+
+    data = {
+        'number of nodes': number_of_nodes,
+        'Configuration': configuration,
+        'Time (s)': execution_duration
+    }
+
+    df = pd.DataFrame(data)
+    # pivot the data so that each "Number of nodes" has its own column for each configuration
+    df_pivot = df.pivot(index='number of nodes', columns='Configuration', values='Time (s)')
+    df_pivot.plot(kind='bar', width=0.8, figsize=(10, 6))
+    plt.xlabel('number of nodes')
+    plt.ylabel('time [s]')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_nodes.png')
 
 def time_number_of_nodes_scatter(experiment_result: ExperimentResult):
     nodes_cpu_gpu_one_stream = [multiple_run_result.parameters.number_od_nodes for multiple_run_result in experiment_result.experiment_result if multiple_run_result.parameters.cpu_enabled and multiple_run_result.parameters.number_of_streams == 1]
@@ -58,7 +78,7 @@ def time_number_of_nodes_scatter(experiment_result: ExperimentResult):
     plt.plot(nodes_cpu_gpu_two_streams, execution_duration_cpu_gpu_two_streams, label="CPU+GPU 2 streams", marker='o')
     plt.plot(nodes_gpu_one_stream, execution_duration_gpu_one_stream, label="GPU 1 stream", marker='o')
     plt.plot(nodes_gpu_two_streams, execution_duration_gpu_two_streams, label="GPU 2 streams", marker='o')
-    plt.xlabel("nodes")
+    plt.xlabel("number of nodes")
     plt.ylabel("time [s]")
     plt.legend()
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_nodes_nodes_{experiment_result.experiment_result[0].parameters.number_od_nodes}.png')
