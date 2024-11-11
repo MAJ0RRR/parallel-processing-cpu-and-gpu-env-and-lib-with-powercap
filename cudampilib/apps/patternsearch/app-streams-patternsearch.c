@@ -30,7 +30,7 @@ long long VECTORSIZE;
 char *vectora;
 char *vectorc;
 
-int batchsize;
+unsigned long batchsize;
 
 long long globalcounter = 0;
 
