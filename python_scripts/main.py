@@ -81,7 +81,7 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
                         common_run_parameters(cpu_enabled=True, batch_size=batch_size),
                         common_run_parameters(cpu_enabled=False, batch_size=batch_size),
                     ]
-                for batch_size in [960_000, 480_000, 120_000, 40_000, 10_000]
+                for batch_size in [960_000, 480_000, 120_000, 40_000, 12_800]
                 ]
             )
         )
