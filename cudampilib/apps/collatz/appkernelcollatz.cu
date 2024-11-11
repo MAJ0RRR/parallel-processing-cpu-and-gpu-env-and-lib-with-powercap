@@ -59,14 +59,16 @@ __global__ void appkernel(void *devPtr)
 
 extern "C" void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream) 
 {
-  dim3 blocksingrid(COLLATZ_BLOCKS_IN_GRID);
-  dim3 threadsinblock(batchSize / COLLATZ_BLOCKS_IN_GRID);
+  // BLOCKS_IN_GRID = batch_size / 64
+  dim3 blocksingrid(batchSize / COLLATZ_THREADS_IN_BLOCK);
+  dim3 threadsinblock(COLLATZ_THREADS_IN_BLOCK);
 
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", COLLATZ_BLOCKS_IN_GRID, batchSize / COLLATZ_BLOCKS_IN_GRID);
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", batchSize / COLLATZ_THREADS_IN_BLOCK, COLLATZ_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
-  if (cudaSuccess != cudaGetLastError()) {
-    log_message(LOG_ERROR, "Error during kernel launch in stream");
+  cudaError_t e = cudaGetLastError();
+  if (cudaSuccess != e) {
+    log_message(LOG_ERROR, "Error during kernel launch in stream, %s", cudaGetErrorString(e));
   }
 }
 
