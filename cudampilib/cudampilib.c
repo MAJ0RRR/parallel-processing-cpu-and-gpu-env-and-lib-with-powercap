@@ -222,13 +222,13 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   float curperfpower;
   int anydeviceenabled = 0;
 
-  printf("\nbefore");
+  log_message(LOG_DEBUG, "\nBefore setting power cap");
   fflush(stdout);
 
   omp_set_lock(&deviceselectionlock);
 
   if (__cudampi__isglobalpowerlimitset == 0) {
-    printf("\n no limite set");
+    log_message(LOG_DEBUG,"\nPowercap has not been set");
     fflush(stdout);
     omp_unset_lock(&deviceselectionlock);
     return 0;
@@ -236,15 +236,13 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
 
   powerleft = __cudampi__globalpowerlimit;
   // this will be invoked from one thread typically
-  printf("\naaa");
   fflush(stdout);
   for (i = 0; i < __cudampi_totaldevicecount; i++) {
-    printf("\nsetting lock on %d %d", i, __cudampi__currentdevice[i]);
+    log_message(LOG_DEBUG,"\nSetting lock on %d %d", i, __cudampi__currentdevice[i]);
     fflush(stdout);
     omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
     // disable all devices at first
   }
-  printf("\nbbb");
   fflush(stdout);
 
   // check of all the devices has been set power
@@ -258,12 +256,12 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
 
   if (!allpowerset) {
     // unlock and quit
-    printf("before unlocking");
+    log_message(LOG_DEBUG,"Before setting powercap");
     fflush(stdout);
     for (i = 0; i < __cudampi_totaldevicecount; i++) {
       omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
     }
-    printf("not all set");
+    log_message(LOG_DEBUG,"After setting powercap");
     fflush(stdout);
 
     omp_unset_lock(&deviceselectionlock);
@@ -278,7 +276,6 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     __cudampi__amimanager[__cudampi__currentdevice[i]] = 0;
   }
 
-  printf("\nggg");
   fflush(stdout);
   int managerselected = 0;
   do {
@@ -302,14 +299,13 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
         __cudampi__amimanager[__cudampi__currentdevice[indexselected]] = 1;
       }
       powerleft -= __cudampi__devicepower[__cudampi__currentdevice[indexselected]];
-      printf("\nSelected device %d", __cudampi__currentdevice[indexselected]);
+      log_message(LOG_DEBUG,"\nSelected device %d", __cudampi__currentdevice[indexselected]);
     }
   } while (indexselected != (-1));
-  printf("hhh");
   fflush(stdout);
 
   if (!anydeviceenabled) { // handle this case
-    printf("No devices found under the power limit");
+    log_message(LOG_ERROR,"No devices found under the power limit");
     fflush(stdout);
     exit(-1);
   }
@@ -326,7 +322,6 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentdevice[i]]));
   }
 
-  printf("\nafter");
   fflush(stdout);
 
   omp_unset_lock(&deviceselectionlock);
@@ -408,7 +403,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
 
   if (mtsprovided != MPI_THREAD_MULTIPLE) {
-    printf("\nNo support for MPI_THREAD_MULTIPLE mode.\n");
+    log_message(LOG_ERROR,"\nNo support for MPI_THREAD_MULTIPLE mode.\n");
     fflush(stdout);
     exit(-1);
   }
@@ -422,13 +417,13 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi__GPUcountspernode = (int *)malloc(sizeof(int) * __cudampi__MPIproccount);
   if (!__cudampi__GPUcountspernode) {
-    printf("\nNot enough memory");
+    log_message(LOG_ERROR,"\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
   __cudampi__freeThreadsPerNode = (int *)malloc(sizeof(int) * __cudampi__MPIproccount);
   if (!__cudampi__freeThreadsPerNode) {
-    printf("\nNot enough memory");
+    log_message(LOG_ERROR,"\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
@@ -436,7 +431,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   // each process first checks its own device count
   if (cudaSuccess != cudaGetDeviceCount(&__cudampi__localGpuDeviceCount)) {
-    printf("Error invoking cudaGetDeviceCount()");
+    log_message(LOG_ERROR,"Error invoking cudaGetDeviceCount()");
     fflush(stdout);
     exit(-1);
   }
@@ -466,29 +461,28 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi_totalgpudevicecount = 0;
   for (i = 0; i < __cudampi__MPIproccount; i++) {
     __cudampi_totalgpudevicecount += __cudampi__GPUcountspernode[i];
-    printf("\nOn node %d using %d GPUs.", i, __cudampi__GPUcountspernode[i]);
+    log_message(LOG_INFO,"\nOn node %d using %d GPUs.", i, __cudampi__GPUcountspernode[i]);
     if (__cudampi__freeThreadsPerNode[i] > 0 ) {
       __cudampi_totalcpudevicecount ++;
     }
-    printf("\nOn node %d using %d CPU threads.", i, __cudampi__freeThreadsPerNode[i]);
+    log_message(LOG_INFO,"\nOn node %d using %d CPU threads.\n", i, __cudampi__freeThreadsPerNode[i]);
   }
 
   __cudampi_totaldevicecount = __cudampi_totalcpudevicecount + __cudampi_totalgpudevicecount;
 
-  printf("\n");
   fflush(stdout);
 
   // now compute proper indexes
 
   __cudampi_targetGPUfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
   if (!__cudampi_targetGPUfordevice) {
-    printf("\nNot enough memory");
+    log_message(LOG_ERROR,"\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
   __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
-    printf("\nNot enough memory");
+    log_message(LOG_ERROR,"\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
@@ -545,7 +539,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
   if (!__cudampi__communicators) {
-    printf("\nNot enough memory for communicators");
+    log_message(LOG_ERROR,"\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
@@ -727,7 +721,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
         power = __cudampi__gettotalpowerofselecteddevices();
         if (power != (-1)) {
           if (power > __cudampi__globalpowerlimit) {
-            printf("\ntotal power=%f limit=%f, adjusting", power, __cudampi__globalpowerlimit);
+            log_message(LOG_DEBUG,"\ntotal power=%f limit=%f, adjusting", power, __cudampi__globalpowerlimit);
             fflush(stdout);
             __cudampi__selectdevicesforpowerlimit_greedy();
           }
