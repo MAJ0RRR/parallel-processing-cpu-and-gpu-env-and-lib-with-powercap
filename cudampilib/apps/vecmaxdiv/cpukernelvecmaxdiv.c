@@ -59,9 +59,9 @@ for (long my_index = 0 ; my_index < num_elements; my_index++)
 }
 }
 
-extern void launchcpukernel(void *devPtr, int num_threads) 
+extern void launchcpukernel(void *devPtr, unsigned long batchSize, int num_threads) 
 {
-    int num_elements = VECMAXDIV_BATCH_SIZE;
+    unsigned long num_elements = batchSize;
     log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
     appkernel(devPtr, num_elements, num_threads);
 }

@@ -23,12 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ENABLE_OUTPUT_LOGS
 #include "utility.h"
 
-long long VECTORSIZE = COLLATZ_VECTORSIZE;
+struct __cudampi__arguments_type __cudampi__arguments;
+
+long long VECTORSIZE;
 
 double *vectora;
 double *vectorc;
 
-int batchsize = COLLATZ_BATCH_SIZE;
+unsigned long batchsize;
 
 long long globalcounter = 0;
 
@@ -44,19 +46,11 @@ int main(int argc, char **argv)
 
   __cudampi__initializeMPI(argc, argv);
 
+  streamcount = __cudampi__arguments.number_of_streams;
+  batchsize = __cudampi__arguments.batch_size;
+  VECTORSIZE = __cudampi__arguments.problem_size;
+
   int alldevicescount = 0;
-
-  if (argc > 1) 
-  {
-    streamcount = atoi(argv[1]);
-  }
-
-  if (argc > 2) 
-  {
-    powerlimit = atof(argv[2]);
-    log_message(LOG_INFO, "\nSetting power limit=%f\n", powerlimit);
-    __cudampi__setglobalpowerlimit(powerlimit);
-  }
 
   __cudampi__getDeviceCount(&alldevicescount);
 
@@ -206,7 +200,7 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
-  save_vector_output_double(vectorc, VECTORSIZE, "collatz_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
+  // save_vector_output_double(vectorc, VECTORSIZE, "collatz_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
 
   cudaFreeHost(vectora);
   cudaFreeHost(vectorc);
