@@ -24,10 +24,10 @@ echo "APP_NAME: '$APP_NAME'"
 echo "MODE: '$MODE'"
 echo "====================================="
 
-if [ "$1" == "H" ]; then
+if [ "$MODE" == "H" ]; then
     echo "There are 2 modes:"
     echo "* Choose: ex ./run_scripts/run-app vecadd C 2 4 6 8 A {args} - run app vecadd remotely on specific machines."
-    echo "* Bulk: ex ./run_scripts/run_app vecadd B 5 {args} - run app vecadd remotely on first 5 machines in hostfile."
+    echo "* Bulk: ex ./run_scripts/run-app vecadd B 5 {args} - run app vecadd remotely on first 5 machines in hostfile."
 elif [ "$MODE" == "C" ]; then
     # Custom machine selection mode
     shift 2  # Remove the 'APP_NAME' and 'MODE' from the arguments
