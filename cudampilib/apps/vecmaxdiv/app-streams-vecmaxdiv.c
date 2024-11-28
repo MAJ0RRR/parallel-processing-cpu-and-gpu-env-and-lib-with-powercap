@@ -13,6 +13,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <sys/time.h>
 
@@ -51,6 +52,8 @@ int main(int argc, char **argv)
   streamcount = __cudampi__arguments.number_of_streams;
   batchsize = __cudampi__arguments.batch_size;
   VECTORSIZE = __cudampi__arguments.problem_size;
+
+  assert(batchsize % VECMAXDIV_THREADS_IN_BLOCK == 0);
 
   int alldevicescount = 0;
 

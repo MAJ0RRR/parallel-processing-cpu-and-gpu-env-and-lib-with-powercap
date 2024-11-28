@@ -25,7 +25,7 @@ float computeDevPerformance(struct timeval period) {
 
 float getGPUpower(int gpuid) {
   char buffer[500];
-  char filename[150];
+  char filename[250];
   float power = 0.0;
 
   // Get home directory and create alternate directory for storing the power file
