@@ -15,6 +15,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include <stdlib.h>
 
+#define ENABLE_LOGGING
+#include "logger.h"
+
 int main(int argc, char **argv) {
 
   __cudampi__initializeMPI(argc, argv);
@@ -49,7 +52,7 @@ int main(int argc, char **argv) {
     __cudampi__deviceSynchronize();
 
     for (i = 2048; i < 4096; i++) {
-      printf("\n ind[%d]=%d", i, (int)(tab[i]));
+      log_message(LOG_DEBUG, "\n ind[%d]=%d", i, (int)(tab[i]));
     }
 
     __cudampi__free(devPtr);
