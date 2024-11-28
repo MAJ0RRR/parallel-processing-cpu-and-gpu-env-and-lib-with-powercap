@@ -71,7 +71,7 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
-int __cudampi__batch_size;
+unsigned long __cudampi__batch_size;
 int __cudampi__cpu_enabled;
 extern struct __cudampi__arguments_type __cudampi__arguments;
 
@@ -98,7 +98,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
       arguments->number_of_streams = atoi(arg);
       break;
     case 'b':
-      arguments->batch_size = atoi(arg);
+      arguments->batch_size = atol(arg);
       break;
     case 'p':
       arguments->powercap = atoi(arg);
@@ -377,9 +377,9 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   return 1;
 }
 
-int __cudampi__getnextchunkindex(long long *globalcounter, int batchsize, long long max) { return __cudampi__getnextchunkindex_enableddevices(globalcounter, batchsize, max); }
+int __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max) { return __cudampi__getnextchunkindex_enableddevices(globalcounter, batchsize, max); }
 
-int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, int batchsize, long long max) {
+int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max) {
   // for a given thread (GPU) return the next available data chunk
   // max is the vector size
   long long mycounter;
@@ -403,7 +403,7 @@ int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, int ba
   return mycounter;
 }
 
-int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, int batchsize, long long max) {
+int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max) {
   // for a given thread (GPU) return the next available data chunk
   // max is the vector size
   long long mycounter;
@@ -509,7 +509,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi__batch_size = __cudampi__arguments.batch_size;
   __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
-  MPI_Bcast(&__cudampi__batch_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__batch_size, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
   MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 
@@ -927,7 +927,7 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
   } else if (kind == cudaMemcpyHostToDevice) {
 
     size_t ssize = sizeof(void *) + count;
-    unsigned char sdata[ssize];
+    unsigned char *sdata = malloc(ssize);
 
     *((void **)sdata) = dst;
     memcpy(sdata + sizeof(void *), src, count); // copy input data
@@ -939,6 +939,7 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
 
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
 
+    free(sdata);
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
@@ -952,12 +953,13 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
-    unsigned char rdata[rsize];
+    unsigned char* rdata = malloc(rsize);
 
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
+    free(rdata);
     return ((cudaError_t)rdata);
   }
 }
@@ -966,7 +968,7 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
   // run remotely
   if (kind == cudaMemcpyHostToDevice) {
     size_t ssize = sizeof(void *) + count;
-    unsigned char sdata[ssize];
+    unsigned char* sdata = malloc(ssize);
 
     *((void **)sdata) = dst;
     memcpy(sdata + sizeof(void *), src, count); // copy input data
@@ -978,6 +980,7 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
 
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUHOSTTODEVICERESP, __cudampi__currentCommunicator, NULL);
 
+    free(sdata);
     return ((cudaError_t)rdata);
 
   } else if (kind == cudaMemcpyDeviceToHost) {
@@ -991,12 +994,13 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTREQ, __cudampi__currentCommunicator);
 
     size_t rsize = sizeof(cudaError_t) + count;
-    unsigned char rdata[rsize];
+    unsigned char* rdata = malloc(rsize);
 
     MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPUDEVICETOHOSTRESP, __cudampi__currentCommunicator, NULL);
 
     memcpy(dst, rdata + sizeof(cudaError_t), count);
 
+    free(rdata);
     return ((cudaError_t)rdata);
   }
 }
@@ -1009,7 +1013,7 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
   } else if (kind == cudaMemcpyHostToDevice) {
 
     size_t ssize = sizeof(void *) + sizeof(cudaStream_t) + sizeof(int) + count;
-    unsigned char sdata[ssize];
+    unsigned char *sdata = malloc(ssize);
 
     *((void **)sdata) = dst;
     *((cudaStream_t *)(sdata + sizeof(void *))) = stream;
@@ -1019,7 +1023,7 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
     waitForAsyncSendResponse(counter);
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ, __cudampi__currentCommunicator);
-
+    free(sdata);
     return cudaSuccess;
 
   } else if (kind == cudaMemcpyDeviceToHost) {
@@ -1079,7 +1083,7 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
   }
 }
 
-void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream);
+void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream);
 
 void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
 

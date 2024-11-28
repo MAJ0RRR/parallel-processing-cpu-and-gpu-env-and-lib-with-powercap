@@ -30,7 +30,7 @@ double *vectora;
 double *vectorb;
 double *vectorc;
 
-int batchsize;
+unsigned long batchsize;
 
 long long globalcounter = 0;
 

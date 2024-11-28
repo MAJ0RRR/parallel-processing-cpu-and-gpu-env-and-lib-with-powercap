@@ -7,8 +7,8 @@ from charts import time_powercap_scatter, time_batch_size_scatter, time_number_o
 from experiments import run_experiment
 
 
-PROBLEM_SIZE = 500_000_000
-NUMBER_OF_RUNS = 5
+PROBLEM_SIZE = 960_000_000
+NUMBER_OF_RUNS = 10
 
 
 def experiment_time_nodes(description: str, app_name: str, file_path: str | os.PathLike):
@@ -81,7 +81,7 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
                         common_run_parameters(cpu_enabled=True, batch_size=batch_size),
                         common_run_parameters(cpu_enabled=False, batch_size=batch_size),
                     ]
-                for batch_size in [1_000_000, 500_000, 100_000, 50_000, 10_000]
+                for batch_size in [3_840_000, 960_000, 480_000, 120_000, 40_000, 12_800]
                 ]
             )
         )

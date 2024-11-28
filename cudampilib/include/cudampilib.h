@@ -21,7 +21,7 @@ struct __cudampi__arguments_type
 {
   int cpu_enabled;
   int number_of_streams;
-  int batch_size;
+  unsigned long batch_size;
   int powercap; // 0 means disabled
   long long problem_size;
 };
@@ -29,9 +29,9 @@ struct __cudampi__arguments_type
 void __cudampi__setglobalpowerlimit(float powerlimit);
 int __cudampi__selectdevicesforpowerlimit_greedy();
 
-int __cudampi__getnextchunkindex(long long *globalcounter, int batchsize, long long max);
-int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, int batchsize, long long max);
-int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, int batchsize, long long max);
+int __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max);
+int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max);
+int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max);
 
 void __cudampi__initializeMPI(int argc, char **argv);
 

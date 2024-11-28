@@ -33,7 +33,7 @@ __global__ void appkernel(void *devPtr)
   devPtrc[my_index] = devPtra[my_index] / 2 + devPtrb[my_index] / 3;
 }
 
-extern "C" void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t stream) 
+extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream) 
 {
   dim3 blocksingrid(VECADD_BLOCKS_IN_GRID);
   dim3 threadsinblock(batchSize / VECADD_BLOCKS_IN_GRID);
@@ -46,4 +46,4 @@ extern "C" void launchkernelinstream(void *devPtr, int batchSize, cudaStream_t s
   }
 }
 
-extern "C" void launchkernel(void *devPtr, int batchSize) { launchkernelinstream(devPtr, batchSize, 0); }
+extern "C" void launchkernel(void *devPtr, unsigned long batchSize) { launchkernelinstream(devPtr, batchSize, 0); }
