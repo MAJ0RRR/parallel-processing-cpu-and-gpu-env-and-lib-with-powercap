@@ -353,10 +353,18 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry, unsigned long
   current_task_queue_entry->scheduled = 1;
   scheduledTasksInStream[stream] += 1;
 
+  // GPU communication tasks should have higher priority
+  // because GPU is faster meaning there will be more GPU-related communication
+  // which increases importance of these request being services fast 
+  int priority = 0;
+  if (stream == CPU_STREAM_FOR_GPU_RESPONSES) {
+    priority = 100;
+  }
+
   if (prev_node == NULL)
   {
     // First task has no 'in' dependency
-    #pragma omp task untied depend(out: current_task_queue_entry->dep_var)
+    #pragma omp task untied depend(out: current_task_queue_entry->dep_var) priority(priority)
     {
       log_message(LOG_DEBUG, "FIRST Launching CPU task. Task ID = %d\n", current_task_queue_entry->id);
 
@@ -384,7 +392,7 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry, unsigned long
     }
   } else {
     // Subsequent tasks depend on the previous task
-    #pragma omp task untied depend(in: prev_node->dep_var) depend(out: current_task_queue_entry->dep_var)
+    #pragma omp task untied depend(in: prev_node->dep_var) depend(out: current_task_queue_entry->dep_var) priority(priority)
     {
       log_message(LOG_DEBUG, "SECOND Launching CPU task. Task ID = %d\n", current_task_queue_entry->id);
 
