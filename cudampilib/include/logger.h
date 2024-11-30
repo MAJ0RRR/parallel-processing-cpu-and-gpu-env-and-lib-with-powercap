@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdarg.h>
+#ifdef MPI_LOGGING
+#include <mpi.h>
+#endif
 
 typedef enum {
     LOG_DEBUG,
@@ -31,7 +34,16 @@ static const char* LOG_LEVEL_NAMES[] = {
             char time_str[20];
             strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", local);
             
+            #ifdef MPI_LOGGING
+            char processor_name[MPI_MAX_PROCESSOR_NAME];
+            int name_len;
+            MPI_Get_processor_name(processor_name, &name_len);
+
+
+            fprintf(stderr, "[%s] [%s] [%s] ", processor_name, time_str, LOG_LEVEL_NAMES[level]);
+            #else
             fprintf(stderr, "[%s] [%s] ", time_str, LOG_LEVEL_NAMES[level]);
+            #endif
             
             va_list args;
             va_start(args, format);

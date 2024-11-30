@@ -20,11 +20,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ALL_CPU_STREAMS CPU_STREAMS_SUPPORTED + 1
 // number of stream dedicated for sending GPU responses to master
 #define CPU_STREAM_FOR_GPU_RESPONSES CPU_STREAMS_SUPPORTED
-// 100 MB per GPU seems reasonable
-#define INITIAL_GPU_BUFFER_SIZE 100000000
+// 1 GB per GPU seems reasonable
+#define INITIAL_GPU_BUFFER_SIZE 1024 * 1024 * 1024
 
 #define ENABLE_LOGGING
+#define MPI_LOGGING
 #include "logger.h"
+
+#define ENABLE_CHECKING_MESSAGE_TYPE
 
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
@@ -77,10 +80,10 @@ void launchcpukernel(void *devPtr, unsigned long batchSize, int thread_count);
 
 typedef struct {
   unsigned char* buffer;
-  unsigned long size;
-  unsigned long overflow;
-  unsigned long pointer;
-  unsigned long allocatedCount;
+  unsigned long long  size;
+  unsigned long long  overflow;
+  unsigned long long pointer;
+  unsigned long long  allocatedCount;
   omp_lock_t lock;
 } globalGpuMemcpyBuffer;
 
@@ -124,13 +127,15 @@ typedef struct gpu_device_to_host_args {
   MPI_Comm* comm;
 } gpu_device_to_host_args_t;
 
-allocatedGpuMemcpyBuffer allocateGpuMemcpyBuffer (globalGpuMemcpyBuffer* global, unsigned long count) {
+allocatedGpuMemcpyBuffer allocateGpuMemcpyBuffer (globalGpuMemcpyBuffer* global, unsigned long long count) {
   unsigned char* data;
   bufferAllocationType allocationType;
 
   omp_set_lock(&global->lock);
 
   if (global->pointer + count > global->size) {
+    // Leave it as warning since the buffer should contain enoguh space in all example apps
+    log_message(LOG_WARN, "Allocating separetely %lld when size = %lld and pointer = %lld\n", count, global->size, global->pointer);
     // Global buffer is not large enough to allocate that memory
     // Allocate it separately and increment overflow bytes in global buffer
     cudaError_t e = cudaHostAlloc((void**)&data, count, cudaHostAllocDefault);
@@ -178,7 +183,7 @@ void freeGpuMemcpyBuffer(allocatedGpuMemcpyBuffer* allocatedBuffer) {
 void updateGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global) {
   omp_set_lock(&global->lock);
   if (global->allocatedCount > 0) {
-    log_message(LOG_ERROR, "Trying to reallocate gpu memcpy buffer while there are still allocated entries !");
+    log_message(LOG_ERROR, "Trying to reallocate gpu memcpy buffer while there are still %lld allocated entries !", global->allocatedCount);
   }
 
   if(global->overflow > 0) {
@@ -222,13 +227,9 @@ void cpuSynchronize()
   // Check if there are tasks waiting to be synchronized
   for (int i = 0; i < CPU_STREAMS_SUPPORTED; i++)
   {
-    log_message(LOG_DEBUG, "%d\n", i);
-    log_message(LOG_DEBUG, "1Synchronizing CPU tasks");
     omp_set_lock(&synchronize_locks[i]);
-    log_message(LOG_DEBUG, "2Synchronizing CPU tasks");
     // Free the lock back
     omp_unset_lock(&synchronize_locks[i]);
-    log_message(LOG_DEBUG, "3Synchronizing CPU tasks");
   }
 }
 
@@ -435,6 +436,22 @@ void cpuTaskLauncher(unsigned long stream)
   omp_unset_lock(&queue_locks[stream]);
 }
 
+void checkGpuThread(const char* requestName) {
+  #ifdef ENABLE_CHECKING_MESSAGE_TYPE
+  if (omp_get_thread_num() >= __cudampi__localGpuDeviceCount) {
+    log_message(LOG_ERROR, "Got GPU request (%s) in non-gpu thread (__cudampi__localGpuDeviceCount = %d)!\n", requestName, __cudampi__localGpuDeviceCount);
+  }
+  #endif
+}
+
+void checkCpuThread(const char* requestName) {
+  #ifdef ENABLE_CHECKING_MESSAGE_TYPE
+  if (omp_get_thread_num() < __cudampi__localGpuDeviceCount) {
+    log_message(LOG_ERROR, "Got CPU request (%s) in non-cpu thread (__cudampi__localGpuDeviceCount = %d)!\n", omp_get_thread_num(), requestName, __cudampi__localGpuDeviceCount);
+  }
+  #endif
+}
+
 int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
@@ -557,9 +574,6 @@ int main(int argc, char **argv) {
   }
   numberOfThreads += ALL_CPU_STREAMS;
 
-  // TODO: Make this configurable from user application
-  unsigned long long gpuBufferSize = INITIAL_GPU_BUFFER_SIZE;
-
   #pragma omp parallel num_threads(numberOfThreads)
   {
 
@@ -568,7 +582,7 @@ int main(int argc, char **argv) {
     globalGpuMemcpyBuffer gpuMemcpyBuffer;
     if (omp_get_thread_num() < __cudampi__localGpuDeviceCount)
     {
-      initializeGlobalGpuMemcpyBuffer(&gpuMemcpyBuffer, gpuBufferSize);
+      initializeGlobalGpuMemcpyBuffer(&gpuMemcpyBuffer, INITIAL_GPU_BUFFER_SIZE);
     }
 
     MPI_Status status;
@@ -581,7 +595,7 @@ int main(int argc, char **argv) {
       MPI_Probe(0, MPI_ANY_TAG, __cudampi__communicators[omp_get_thread_num()], &status);
 
       if (status.MPI_TAG == __cudampi__CUDAMPIMALLOCREQ) {
-
+        checkGpuThread("__cudampi__CUDAMPIMALLOCREQ");
         unsigned long rdata;
 
         MPI_Recv((unsigned long *)(&rdata), 1, MPI_UNSIGNED_LONG, 0, __cudampi__CUDAMPIMALLOCREQ, __cudampi__communicators[omp_get_thread_num()], &status);
@@ -602,6 +616,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUMALLOCREQ) {
+        checkCpuThread("__cudampi__CPUMALLOCREQ");
 
         unsigned long rdata;
 
@@ -626,6 +641,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIFREEREQ) {
+        checkGpuThread("__cudampi__CUDAMPIFREEREQ");
 
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
@@ -640,6 +656,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUFREEREQ) {
+        checkCpuThread("__cudampi__CPUFREEREQ");
         int rsize = sizeof(void *);
         unsigned char rdata[rsize];
 
@@ -661,6 +678,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
+        checkGpuThread("__cudampi__CUDAMPIDEVICESYNCHRONIZEREQ");
 
         int measurepower;
 
@@ -673,7 +691,7 @@ int main(int argc, char **argv) {
 
         int device;
         cudaGetDevice(&device);
-  
+
         cudaError_t e = cudaDeviceSynchronize();
         
         // Synchronize async memcpy tasks
@@ -691,6 +709,7 @@ int main(int argc, char **argv) {
 
       if (status.MPI_TAG == __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ) {
 
+        checkCpuThread("__cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ");
         int measurepower;
         cudaError_t error = cudaErrorUnknown;
 
@@ -719,6 +738,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISETDEVICEREQ) {
+        checkGpuThread("__cudampi__CUDAMPISETDEVICEREQ");
 
         int device;
 
@@ -730,6 +750,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIHOSTTODEVICEREQ) {
+        checkGpuThread("__cudampi__CUDAMPIHOSTTODEVICEREQ");
 
         // in this case in the message there is a serialized pointer and data so we need to find out the size first
 
@@ -755,6 +776,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIHOSTTODEVICEASYNCREQ) {
+        checkGpuThread("__cudampi__CUDAMPIHOSTTODEVICEASYNCREQ");
 
         // in this case in the message there is a serialized pointer and data so we need to find out the size first
 
@@ -799,6 +821,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICETOHOSTREQ) {
+        checkGpuThread("__cudampi__CUDAMPIDEVICETOHOSTREQ");
 
         // in this case in the message there is a serialized pointer and size of data to fetch
 
@@ -828,6 +851,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPIDEVICETOHOSTASYNCREQ) {
+        checkGpuThread("__cudampi__CUDAMPIDEVICETOHOSTASYNCREQ");
 
         // in this case in the message there is a serialized pointer and size of data to fetch
 
@@ -874,6 +898,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQ) {
+        checkCpuThread("__cudampi__CPUHOSTTODEVICEREQ");
         int rsize;
         MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rsize);
 
@@ -901,6 +926,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQ) {
+        checkCpuThread("__cudampi__CPUDEVICETOHOSTREQ");
         int rsize = sizeof(void *) + sizeof(unsigned long);
         unsigned char rdata[rsize];
 
@@ -931,6 +957,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUHOSTTODEVICEREQASYNC) {
+        checkCpuThread("__cudampi__CPUHOSTTODEVICEREQASYNC");
         int rsize = sizeof(void*) + sizeof(unsigned long) + sizeof(unsigned long) + sizeof(int);
         // Receive a request with number of bytes that will be sent and a pointer
         unsigned char rdata[rsize];
@@ -949,6 +976,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUDEVICETOHOSTREQASYNC) {
+        checkCpuThread("__cudampi__CPUDEVICETOHOSTREQASYNC");
         int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long) + sizeof(int);
         unsigned char rdata[rsize];
 
@@ -966,6 +994,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
+        checkGpuThread("__cudampi__CUDAMPILAUNCHCUDAKERNELREQ");
 
         // in this case in the message there is a serialized pointer
 
@@ -986,6 +1015,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
+        checkCpuThread("__cudampi__CPULAUNCHKERNELREQ");
         int rsize = sizeof(void *) + sizeof(unsigned long);
         if (!isInitialCpuEnergyMeasured)
         {
@@ -1011,6 +1041,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
+        checkGpuThread("__cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ");
 
         // in this case in the message there is a serialized pointer
 
@@ -1026,6 +1057,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISTREAMCREATEREQ) {
+        checkGpuThread("__cudampi__CUDAMPISTREAMCREATEREQ");
 
         MPI_Recv(NULL, 0, MPI_UNSIGNED_LONG, 0, __cudampi__CUDAMPISTREAMCREATEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
@@ -1046,6 +1078,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CUDAMPISTREAMDESTROYREQ) {
+        checkGpuThread("__cudampi__CUDAMPISTREAMDESTROYREQ");
 
         int rsize = sizeof(cudaStream_t);
         unsigned char rdata[rsize];
@@ -1060,6 +1093,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUSTREAMCREATEREQ) {
+        checkCpuThread("__cudampi__CPUSTREAMCREATEREQ");
 
         MPI_Recv(NULL, 0, MPI_UNSIGNED_LONG, 0, __cudampi__CPUSTREAMCREATEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
@@ -1089,6 +1123,7 @@ int main(int argc, char **argv) {
       }
 
       if (status.MPI_TAG == __cudampi__CPUSTREAMDESTROYREQ) {
+        checkCpuThread("__cudampi__CPUSTREAMDESTROYREQ");
         int rsize = sizeof(unsigned long);
         unsigned char rdata[rsize];
 
