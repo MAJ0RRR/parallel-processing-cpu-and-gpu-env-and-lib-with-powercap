@@ -16,6 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <nvml.h>
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -27,55 +28,24 @@ float computeDevPerformance(struct timeval period) {
 }
 
 float getGPUpower(int gpuid) {
-  char buffer[500];
-  char filename[250];
-  float power = 0.0;
+    nvmlReturn_t result;
+    unsigned int power_mw;
+    float power_watts;
+    nvmlDevice_t nvmlDevice;
 
-  // Get home directory and create alternate directory for storing the power file
-  const char *home = getenv("HOME");
-  if (home == NULL) {
-      fprintf(stderr, "Error: Could not determine home directory\n");
-      return -1;
-  }
+    result = nvmlDeviceGetHandleByIndex(gpuid, &nvmlDevice);
+    if (result != NVML_SUCCESS) {
+        log_message(LOG_ERROR, "nvmlDeviceGetHandleByIndex failed: %s\n", nvmlErrorString(result));
+        return -1;
+    }
 
-  // Create the mytmp directory in home if it doesn't exist
-  char mytmp_dir[200];
-  sprintf(mytmp_dir, "%s/mytmp", home);
+    result = nvmlDeviceGetPowerUsage(nvmlDevice, &power_mw);
+    if (result != NVML_SUCCESS) {
+        log_message(LOG_ERROR, "Failed to get power usage: %s\n", nvmlErrorString(result));
+        return -1;
+    }
 
-  // Check if the directory exists, if not create it
-  struct stat st = {0};
-  if (stat(mytmp_dir, &st) == -1) {
-      if (mkdir(mytmp_dir, 0700) != 0) {
-          fprintf(stderr, "Error: Could not create directory %s: %s\n", mytmp_dir, strerror(errno));
-          return -1;
-      }
-  }
-
-  sprintf(filename, "%s/__cudampi__gpu_power.%d", mytmp_dir, gpuid);
-
-  sprintf(buffer, "nvidia-smi -q -i %d -d POWER | grep \"Power Draw\" | tr -s ' ' | cut -d ' ' -f 5 > %s", gpuid, filename);
-
-  int ret = system(buffer);
-  if (ret != 0) {
-      fprintf(stderr, "Error: Failed to execute nvidia-smi command for GPU %d\n", gpuid);
-      return -1;
-  }
-
-  FILE *fp = fopen(filename, "r");
-  if (fp == NULL) {
-      fprintf(stderr, "Error: Could not open file %s\n", filename);
-      return -1;
-  }
-
-  if (fscanf(fp, "%f", &power) != 1) {
-      fprintf(stderr, "Error: Failed to read power value for GPU %d\n", gpuid);
-      fclose(fp);
-      return -1;
-  }
-
-  fclose(fp);
-
-  return power;
+    return (float)power_mw / 1000.0;
 }
 
 cudaError_t __cudampi__getCpuFreeThreads(int* count)
@@ -100,13 +70,13 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   }
 
   if (fscanf(file, "%llu", &energy_uj) != 1) {
-      perror("Failed to read energy value");
+      log_message(LOG_ERROR, "Failed to read energy value");
       fclose(file);
       return cudaErrorUnknown ;
   }
 
   fclose(file);
-
+  log_message(LOG_DEBUG, "Got energy_uj = %lld", energy_uj);
   energy_joules = (float)energy_uj / 1e6;
 
   *energyUsed = energy_joules - *lastEnergyMeasured;
