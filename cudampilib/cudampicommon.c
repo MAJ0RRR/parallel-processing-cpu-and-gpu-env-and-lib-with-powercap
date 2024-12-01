@@ -16,6 +16,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#define ENABLE_LOGGING
+#define MPI_LOGGING
+#include "logger.h"
 
 float computeDevPerformance(struct timeval period) {
   // period is just the time between two events so compute performance as an inverse
@@ -92,7 +95,7 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
 
   file = fopen("/sys/class/powercap/intel-rapl:0/energy_uj", "r");
   if (file == NULL) {
-      perror("Failed to open energy_uj file");
+      log_message(LOG_ERROR, "Failed to open energy_uj file");
       return cudaErrorUnknown ;
   }
 
