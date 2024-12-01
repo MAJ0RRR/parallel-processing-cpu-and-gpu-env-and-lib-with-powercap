@@ -14,6 +14,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #define ENABLE_LOGGING
 #include "logger.h"
@@ -50,6 +51,8 @@ int main(int argc, char **argv)
   batchsize = __cudampi__arguments.batch_size;
   VECTORSIZE = __cudampi__arguments.problem_size;
 
+  assert(batchsize % VECADD_THREADS_IN_BLOCK == 0);
+
   int alldevicescount = 0;
 
   __cudampi__getDeviceCount(&alldevicescount);
@@ -66,6 +69,13 @@ int main(int argc, char **argv)
   {
     log_message(LOG_ERROR, "\nNot enough memory.");
     exit(-1);
+  }
+
+  // Fill vectora with all 1's
+  for (size_t i = 0; i < VECTORSIZE; i++) 
+  {
+      vectora[i] = ((int)i % 100);
+      vectorb[i] = 1.0;
   }
 
   cudaHostAlloc((void **)&vectorc, sizeof(double) * VECTORSIZE, cudaHostAllocDefault);
@@ -227,7 +237,7 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Main elapsed time=%f\n", (double)((stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000.0));
 
   __cudampi__terminateMPI();
-  // save_vector_output_double(vectorc, VECTORSIZE, "vecadd_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
+  save_vector_output_double(vectorc, VECTORSIZE, "vecadd_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
 
   cudaFreeHost(vectora);
   cudaFreeHost(vectorb);

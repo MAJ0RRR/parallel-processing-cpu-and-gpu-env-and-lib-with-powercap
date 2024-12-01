@@ -47,10 +47,10 @@ __global__ void appkernel(void *devPtr) {
 
 extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream) {
 
-  dim3 blocksingrid(PATTERNSEARCH_BLOCKS_IN_GRID);
-  dim3 threadsinblock(batchSize / PATTERNSEARCH_BLOCKS_IN_GRID);
+  dim3 blocksingrid(batchSize / PATTERNSEARCH_THREADS_IN_BLOCK);
+  dim3 threadsinblock(PATTERNSEARCH_THREADS_IN_BLOCK);
 
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", PATTERNSEARCH_BLOCKS_IN_GRID, batchSize / PATTERNSEARCH_BLOCKS_IN_GRID);
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", batchSize / PATTERNSEARCH_THREADS_IN_BLOCK, PATTERNSEARCH_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {

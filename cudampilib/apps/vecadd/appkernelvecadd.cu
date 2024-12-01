@@ -35,10 +35,10 @@ __global__ void appkernel(void *devPtr)
 
 extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream) 
 {
-  dim3 blocksingrid(VECADD_BLOCKS_IN_GRID);
-  dim3 threadsinblock(batchSize / VECADD_BLOCKS_IN_GRID);
+  dim3 blocksingrid(batchSize / VECADD_THREADS_IN_BLOCK);
+  dim3 threadsinblock(VECADD_THREADS_IN_BLOCK);
 
-  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", VECADD_BLOCKS_IN_GRID, batchSize / VECADD_BLOCKS_IN_GRID);
+  log_message(LOG_DEBUG, "Launichng GPU Kernel with %i blocks in grid and %i threads in block.", batchSize / VECADD_THREADS_IN_BLOCK, VECADD_THREADS_IN_BLOCK);
   appkernel<<<blocksingrid, threadsinblock, 0, stream>>>(devPtr);
 
   if (cudaSuccess != cudaGetLastError()) {
