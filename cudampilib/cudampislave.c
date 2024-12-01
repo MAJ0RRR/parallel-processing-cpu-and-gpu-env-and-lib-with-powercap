@@ -36,6 +36,8 @@ int debugTaskCounter = 0;
 float lastEnergyMeasured = 0.0;
 float lastGpuEnergyMeasured  = 0.0;
 
+struct timespec* lastGPUMeasurementTime = NULL;
+
 float energyUsed = 0.0;
 
 float totalGPUEnergyMeasured = 0.0;
@@ -696,7 +698,8 @@ int main(int argc, char **argv) {
         measurepower = 1; // For testing purpose
 
         if (measurepower && error == cudaSuccess) {
-            error = getGpuEnergyUsed(device, &lastGpuEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)), &totalGPUEnergyMeasured);
+            error = getGpuEnergyUsed(device, &lastGpuEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)),
+                                     &totalGPUEnergyMeasured, &lastGPUMeasurementTime);
         }
 
         if (error != cudaSuccess) {
@@ -995,7 +998,7 @@ int main(int argc, char **argv) {
                 // This variable is unused since we just need to initialize lastGpuEnergyMeasured and don't care about actual value
                 float gpuEnergyMeasured;
                 isInitialGpuEnergyMeasured = 1;
-                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, NULL);
+                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, NULL, &lastGPUMeasurementTime);
             }
             omp_unset_lock(&gpuEnergyLock);
         }
@@ -1184,7 +1187,7 @@ else
       log_message(LOG_ERROR,"Error while closing NVML: %s\n", nvmlErrorString(nvmlResult));
       return 1;
   }
-  log_message(LOG_ERROR,"NVML works fine.\n");
+  log_message(LOG_INFO,"NVML works fine.\n");
 
   for (int i = 0; i < ALL_CPU_STREAMS; i++)
   {
@@ -1194,6 +1197,5 @@ else
   }
 
   log_message(LOG_INFO, "Total CPU energy: %d \n", totalCPUEnergyMeasured);
-
   log_message(LOG_INFO, "Total GPU energy: %f\n", (double)totalGPUEnergyMeasured / 1.0);
 }

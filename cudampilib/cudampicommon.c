@@ -16,7 +16,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-#include <nvml.h> // NVIDIA Management Library for GPU monitoring
+#include <time.h>
+#include <nvml.h>
 
 #define ENABLE_LOGGING
 #include "logger.h"
@@ -119,7 +120,8 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   return cudaSuccess;
 }
 
-cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed) {
+cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed,
+                             struct timespec* lastMeasurementTime) {
     // checks power consumption since last measurement and updates variables
 
     nvmlReturn_t result;
@@ -134,10 +136,25 @@ cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, flo
 
     power_watts = (float)power_mw / 1000.0f;
 
-    energy_joules = power_watts;
+    struct timespec currentTime;
+    if (clock_gettime(CLOCK_MONOTONIC, &currentTime) != 0) {
+        perror("Failed to get current time");
+        return cudaErrorUnknown;
+    }
+
+    if (lastMeasurementTime == NULL) {
+        lastMeasurementTime = currentTime;
+    }
+
+    float timeElapsed = (float)(currentTime.tv_sec - lastMeasurementTime->tv_sec) +
+                        (float)(currentTime.tv_nsec - lastMeasurementTime->tv_nsec) / 1e9;
+
+    // (E = P * t)
+    energy_joules = power_watts * timeElapsed;
+
+    *lastMeasurementTime = currentTime;
 
     *energyUsed = energy_joules - *lastEnergyMeasured;
-
     *lastEnergyMeasured = energy_joules;
 
     if (totalEnergyUsed != NULL) {
