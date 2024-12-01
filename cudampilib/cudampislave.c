@@ -445,22 +445,6 @@ void cpuTaskLauncher(unsigned long stream)
   omp_unset_lock(&queue_locks[stream]);
 }
 
-void checkGpuThread(const char* requestName) {
-  #ifdef ENABLE_CHECKING_MESSAGE_TYPE
-  if (omp_get_thread_num() >= __cudampi__localGpuDeviceCount) {
-    log_message(LOG_ERROR, "Got GPU request (%s) in non-gpu thread (__cudampi__localGpuDeviceCount = %d)!\n", requestName, __cudampi__localGpuDeviceCount);
-  }
-  #endif
-}
-
-void checkCpuThread(const char* requestName) {
-  #ifdef ENABLE_CHECKING_MESSAGE_TYPE
-  if (omp_get_thread_num() < __cudampi__localGpuDeviceCount) {
-    log_message(LOG_ERROR, "Got CPU request (%s) in non-cpu thread (__cudampi__localGpuDeviceCount = %d)!\n", omp_get_thread_num(), requestName, __cudampi__localGpuDeviceCount);
-  }
-  #endif
-}
-
 int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
