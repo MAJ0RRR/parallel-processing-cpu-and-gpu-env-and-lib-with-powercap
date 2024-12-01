@@ -699,7 +699,7 @@ int main(int argc, char **argv) {
 
         if (measurepower && error == cudaSuccess) {
             error = getGpuEnergyUsed(device, &lastGpuEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)),
-                                     &totalGPUEnergyMeasured, &lastGPUMeasurementTime);
+                                     &totalGPUEnergyMeasured, lastGPUMeasurementTime);
         }
 
         if (error != cudaSuccess) {
@@ -998,7 +998,7 @@ int main(int argc, char **argv) {
                 // This variable is unused since we just need to initialize lastGpuEnergyMeasured and don't care about actual value
                 float gpuEnergyMeasured;
                 isInitialGpuEnergyMeasured = 1;
-                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, NULL, &lastGPUMeasurementTime);
+                getGpuEnergyUsed(device, &lastGpuEnergyMeasured, &gpuEnergyMeasured, NULL, lastGPUMeasurementTime);
             }
             omp_unset_lock(&gpuEnergyLock);
         }

@@ -143,7 +143,7 @@ cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, flo
     }
 
     if (lastMeasurementTime == NULL) {
-        lastMeasurementTime = currentTime;
+        *lastMeasurementTime = currentTime;
     }
 
     float timeElapsed = (float)(currentTime.tv_sec - lastMeasurementTime->tv_sec) +

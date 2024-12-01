@@ -22,6 +22,6 @@ float getGPUpower(int gpuid);
 
 cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed);
 
-cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed);
+cudaError_t getGpuEnergyUsed(nvmlDevice_t device, float* lastEnergyMeasured, float* energyUsed, float* totalEnergyUsed, struct timespec* lastMeasurementTime);
 
 cudaError_t __cudampi__getCpuFreeThreads(int* count);
