@@ -12,6 +12,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/queue.h>
+#include <nvml.h>
 
 #include "cudampi.h"
 #include "cudampicommon.h"
@@ -589,6 +590,14 @@ int main(int argc, char **argv) {
       terminated[i] = 1;
     }
   }
+
+  // initialize nvml
+  nvmlReturn_t nvmlResult = nvmlInit();
+  if (nvmlResult != NVML_SUCCESS) {
+      log_message(LOG_ERROR, "nvmlInit failed: %s\n", nvmlErrorString(nvmlResult));
+      return -1;
+  }
+
   #pragma omp parallel num_threads(numberOfThreads)
   {
 
@@ -1152,6 +1161,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  nvmlShutdown();
   MPI_Finalize();
   
   for (int i = 0; i < ALL_CPU_STREAMS; i++)
@@ -1160,4 +1170,5 @@ int main(int argc, char **argv) {
     omp_destroy_lock(&synchronize_locks[i]);
     omp_destroy_lock(&task_available_locks[i]);
   }
+  
 }
