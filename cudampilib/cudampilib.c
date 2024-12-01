@@ -15,7 +15,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <string.h>
 #include <sys/time.h>
 #include <sys/queue.h>
-
+#include <nvml.h>
 #include <omp.h>
 
 #define ENABLE_LOGGING
@@ -48,6 +48,8 @@ int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int __cudampi__MPIinitialized = 0;
 int __cudampi__MPIproccount;
 int __cudampi__myrank;
+
+double __cudampi__totalEnergyUsed = 0;
 
 int __cudampi__currentdevice[__CUDAMPI_MAX_THREAD_COUNT]; // current device id for various threads in process 0
 
@@ -469,11 +471,17 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   log_message(LOG_INFO, "Power Cap         : %d", __cudampi__arguments.powercap);
   log_message(LOG_INFO, "Problem Size      : %lld", __cudampi__arguments.problem_size);
 
+  // initialize NVML for local GPU
+  nvmlReturn_t nvmlResult = nvmlInit();
+  if (nvmlResult != NVML_SUCCESS) {
+      log_message(LOG_ERROR, "nvmlInit failed: %s\n", nvmlErrorString(nvmlResult));
+      exit(-1);
+  }
+
   if (__cudampi__arguments.powercap > 0) {
     log_message(LOG_INFO, "\nSetting power limit=%f\n", __cudampi__arguments.powercap);
     __cudampi__setglobalpowerlimit(__cudampi__arguments.powercap);
   }
-
 
   // fetch information about the rank and number of processes
 
@@ -643,6 +651,9 @@ void __cudampi__terminateMPI() {
     MPI_Send(NULL, 0, MPI_CHAR, 1, __cudampi__CUDAMPIFINALIZE, __cudampi__communicators[i]);
   }
 
+  nvmlShutdown();
+
+  log_message(LOG_WARN, "Terminating CUDAMPILIB, Total energy used %lf J", __cudampi__totalEnergyUsed);
   MPI_Finalize();
 }
 
@@ -808,12 +819,13 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     // now get power measurement - this should be OK as we assume that computations might be taking place
 
     power = getGPUpower(__cudampi__currentDevice);
+    log_message(LOG_DEBUG, "Got local GPU power %f", power);
 
     retVal = cudaDeviceSynchronize();
   } else { // run synchronization remotely
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
-    int sdata = 0; // if 0 then means do not measure power, if 1 do measure on the slave side
+    int sdata = 1; // if 0 then means do not measure power, if 1 do measure on the slave side
     int rsize = sizeof(cudaError_t) + sizeof(float);
     unsigned char rdata[rsize];
 
@@ -829,6 +841,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       // decode and store power consumption for the device
 
       energy = *((float *)(rdata + sizeof(cudaError_t)));
+      log_message(LOG_DEBUG, "Got CPU energy %f", energy);
     }
     else
     {
@@ -841,6 +854,7 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       // decode and store power consumption for the device
 
       power = *((float *)(rdata + sizeof(cudaError_t)));
+      log_message(LOG_DEBUG, "Got remote GPU power %f", power);
     }
     process_queue();
 
@@ -857,12 +871,12 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     __cudampi__time[__cudampi__currentDevice].tv_sec = __cudampi__timestop[__cudampi__currentDevice].tv_sec - __cudampi__timestart[__cudampi__currentDevice].tv_sec;    // compute current time
     __cudampi__time[__cudampi__currentDevice].tv_usec = __cudampi__timestop[__cudampi__currentDevice].tv_usec - __cudampi__timestart[__cudampi__currentDevice].tv_usec; // compute current time
     struct timeval elapsed_time = __cudampi__time[__cudampi__currentDevice];
+    double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
     omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
 
     if (__cudampi__isCpu() && (energy != -1)){
-      double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
       power = energy / time_in_seconds;
     }
 
@@ -870,6 +884,10 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
       __cudampi__devicepower[__cudampi__currentDevice] = power;
       omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+      
+      log_message(LOG_DEBUG, "Got power %f with time in seconds = %f", power, time_in_seconds);
+      #pragma omp atomic
+      __cudampi__totalEnergyUsed += power * time_in_seconds;
     }
     
   } else {
