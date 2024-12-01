@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <omp.h>
 
 #define ENABLE_LOGGING
+#define MPI_LOGGING
 #include "logger.h"
 
 #include "cudampicommon.h"
