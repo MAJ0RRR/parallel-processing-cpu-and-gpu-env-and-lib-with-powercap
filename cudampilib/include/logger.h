@@ -7,11 +7,12 @@
 
 #ifdef MPI_LOGGING
 #include <mpi.h>
+#include <omp.h>
 #endif
 
-typedef enum { LOG_DEBUG, LOG_WARN, LOG_INFO, LOG_ERROR } LogLevel;
+typedef enum { LOG_DEBUG = 0, LOG_INFO, LOG_WARN, LOG_ERROR } LogLevel;
 
-static const char *LOG_LEVEL_NAMES[] = {"DEBUG", "WARN", "INFO", "ERROR"};
+static const char *LOG_LEVEL_NAMES[] = {"DEBUG", "INFO", "WARN", "ERROR"};
 
 #ifdef ENABLE_LOGGING
 #define LOG_LEVEL_THRESHOLD LOG_INFO
@@ -36,7 +37,7 @@ static void log_message(LogLevel level, const char *format, ...) {
     int name_len;
     MPI_Get_processor_name(processor_name, &name_len);
 
-    fprintf(stderr, "[%s] [%s] [%s] ", processor_name, time_str, LOG_LEVEL_NAMES[level]);
+    fprintf(stderr, "[%s] [Thread %d] [%s] [%s] ", processor_name, omp_get_thread_num(), time_str, LOG_LEVEL_NAMES[level]);
 #else
     fprintf(stderr, "[%s] [%s] ", time_str, LOG_LEVEL_NAMES[level]);
 #endif
@@ -71,7 +72,7 @@ static void log_message(LogLevel level, const char *format, ...) {
   int name_len;
   MPI_Get_processor_name(processor_name, &name_len);
 
-  fprintf(log_file, "[%s] [%s] [%s] ", processor_name, time_str, LOG_LEVEL_NAMES[level]);
+  fprintf(log_file, "[%s] [Thread %d] [%s] [%s] ", processor_name, omp_get_thread_num(), time_str, LOG_LEVEL_NAMES[level]);
 #else
   fprintf(log_file, "[%s] [%s] ", time_str, LOG_LEVEL_NAMES[level]);
 #endif
