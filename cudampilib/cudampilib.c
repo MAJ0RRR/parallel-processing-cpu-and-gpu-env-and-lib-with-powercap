@@ -74,6 +74,11 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
+
+// PROFILING
+unsigned long __cudampi__batches_sent[__CUDAMPI_MAX_THREAD_COUNT];
+
+
 unsigned long __cudampi__batch_size;
 int __cudampi__cpu_enabled;
 extern struct __cudampi__arguments_type __cudampi__arguments;
@@ -551,6 +556,11 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi_totaldevicecount = __cudampi_totalcpudevicecount + __cudampi_totalgpudevicecount;
 
+  // PROFILING
+  for (int i = 0; i < __cudampi_totaldevicecount;i++){
+    __cudampi__batches_sent[i] = 0L;
+  }
+
   fflush(stdout);
 
   // now compute proper indexes
@@ -644,6 +654,11 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 }
 
 void __cudampi__terminateMPI() {
+
+  // PROFILING
+  for (int i = 0; i < __cudampi_totaldevicecount;i++){
+    log_message(LOG_INFO, "Batches sent by thread %d: %ld", i, __cudampi__batches_sent[i]);
+  }
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
@@ -1254,6 +1269,7 @@ cudaError_t __cudampi__streamDestroy(cudaStream_t stream) {
 }
 
 cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
+  __cudampi__batches_sent[omp_get_thread_num()] += 1L;
   if (__cudampi__isCpu())
   {
     return __cudampi__cpuMemcpyAsync(dst, src, count, kind, stream);
@@ -1263,6 +1279,7 @@ cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enu
 }
 
 cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+  __cudampi__batches_sent[omp_get_thread_num()] += 1L;
   if (__cudampi__isCpu())
   {
     return __cudampi__cpuMemcpy(dst, src, count, kind);
