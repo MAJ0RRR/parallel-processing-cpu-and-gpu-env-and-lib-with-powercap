@@ -178,7 +178,7 @@ int main(int argc, char **argv)
     }
     do 
     {
-      batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+      batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
 
       if (batch_pointer.start >= VECTORSIZE) 
       {
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
         __cudampi__memcpyAsync(vectorc + batch_pointer.start, devPtrc, batch_pointer.n_elements * sizeof(double), cudaMemcpyDeviceToHost, stream1);
         if (streamcount == 2) 
         {
-            batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+            batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
 
             if (batch_pointer.start >= VECTORSIZE)
             {

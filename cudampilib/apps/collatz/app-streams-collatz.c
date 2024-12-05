@@ -148,7 +148,7 @@ int main(int argc, char **argv)
     }
     do 
     {
-      batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+      batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
 
       if (batch_pointer.start >= VECTORSIZE) 
       {
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
 
         if (streamcount == 2) 
         {
-          batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+          batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
 
           if (batch_pointer.start >= VECTORSIZE) 
           {

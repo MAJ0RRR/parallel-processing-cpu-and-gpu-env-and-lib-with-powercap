@@ -48,7 +48,6 @@ int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
-unsigned long __cudampi__batch_size;
 int __cudampi__cpu_enabled;
 
 unsigned long cpuStreamsValid[CPU_STREAMS_SUPPORTED];
@@ -75,7 +74,7 @@ int scheduledTasksInStream[ALL_CPU_STREAMS];
 omp_lock_t cpuEnergyLock;
 int isInitialCpuEnergyMeasured = 0;
 
-void launchkernel(void *devPtr);
+void launchkernel(void *devPtr, unsigned long batchSize);
 void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream);
 void launchcpukernel(void *devPtr, unsigned long batchSize, int thread_count);
 
@@ -99,34 +98,39 @@ typedef struct {
   globalGpuMemcpyBuffer* globalPtr;
 } allocatedGpuMemcpyBuffer;
 
-typedef struct cpu_host_to_device_args {
+typedef struct {
   void *devPtr;
   size_t count;
   int tag;
   MPI_Comm* comm;
 } cpu_host_to_device_args_t;
 
-typedef struct gpu_host_to_device_args {
+typedef struct {
   cudaEvent_t event;
   int tag;
   MPI_Comm* comm;
   allocatedGpuMemcpyBuffer buffer;
 } gpu_host_to_device_args_t;
 
-typedef struct cpu_device_to_host_args {
+typedef struct {
   void *devPtr;
   unsigned long count;
   int tag;
   MPI_Comm* comm;
 } cpu_device_to_host_args_t;
 
-typedef struct gpu_device_to_host_args {
+typedef struct {
   cudaEvent_t event;
   allocatedGpuMemcpyBuffer buffer;
   unsigned long count;
   int tag;
   MPI_Comm* comm;
 } gpu_device_to_host_args_t;
+
+typedef struct {
+  void *kernelArg;
+  unsigned long batchSize;
+} launch_kernel_args_t;
 
 allocatedGpuMemcpyBuffer allocateGpuMemcpyBuffer (globalGpuMemcpyBuffer* global, unsigned long long count) {
   unsigned char* data;
@@ -297,8 +301,9 @@ void logGpuMemcpyError(cudaError_t e, int tag) {
 }
 
 void cpuLaunchKernelTask(void* arg) {
-  // kernel just takes void*
-  launchcpukernel(arg, __cudampi__batch_size ,__cudampi__localFreeThreadCount - 1);
+  launch_kernel_args_t *args = (launch_kernel_args_t*) arg; 
+  launchcpukernel(args->kernelArg, args->batchSize, __cudampi__localFreeThreadCount - 1);
+  free(arg);
 }
 
 void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long stream)
@@ -499,7 +504,6 @@ int main(int argc, char **argv) {
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Bcast(&__cudampi__batch_size, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
   MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   if (__cudampi__cpu_enabled){
@@ -806,14 +810,15 @@ int main(int argc, char **argv) {
         if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
           // in this case in the message there is a serialized pointer
 
-          int rsize = sizeof(void *);
+          int rsize = sizeof(void *) + sizeof(unsigned long);
           unsigned char rdata[rsize];
 
           MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
           void *devPtr = *((void **)rdata);
+          unsigned long batchSize = *((unsigned long *)(rdata + sizeof(void *)));
 
-          launchkernel(devPtr);
+          launchkernel(devPtr, batchSize);
 
           size_t ssize = sizeof(cudaError_t);
           unsigned char sdata[ssize];
@@ -825,15 +830,16 @@ int main(int argc, char **argv) {
         if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
           // in this case in the message there is a serialized pointer
 
-          int rsize = sizeof(void *) + sizeof(cudaStream_t);
+          int rsize = sizeof(void *) + sizeof(cudaStream_t) + sizeof(unsigned long);
           unsigned char rdata[rsize];
 
           MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
           void *devPtr = *((void **)rdata);
-          cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *)));
+          unsigned long batchSize = *((unsigned long *)(rdata + sizeof(void *)));
+          cudaStream_t stream = *((cudaStream_t *)(rdata + sizeof(void *) + sizeof(unsigned long)));
 
-          launchkernelinstream(devPtr, __cudampi__batch_size, stream);
+          launchkernelinstream(devPtr, batchSize, stream);
         }
 
         if (status.MPI_TAG == __cudampi__CUDAMPISTREAMCREATEREQ) {
@@ -1041,7 +1047,7 @@ int main(int argc, char **argv) {
         }
 
         if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
-          int rsize = sizeof(void *) + sizeof(unsigned long);
+          int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long);
           if (!isInitialCpuEnergyMeasured) {
             // Initialize CPU energy value
             omp_set_lock(&cpuEnergyLock);
@@ -1058,9 +1064,15 @@ int main(int argc, char **argv) {
 
           MPI_Recv((unsigned char *)rdata, rsize, MPI_UNSIGNED_CHAR, 0, __cudampi__CPULAUNCHKERNELREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
-          unsigned long stream = *((unsigned long *)(rdata + sizeof(void *)));
+          
+          launch_kernel_args_t *args = malloc(sizeof(cpu_host_to_device_args_t));
+          args->kernelArg = *((void **)rdata);
+          args->batchSize = *((unsigned long *)(rdata + sizeof(void *)));
+
+          unsigned long stream = *((unsigned long *)(rdata + sizeof(void *) + sizeof(unsigned long)));
+
           log_message(LOG_DEBUG, "Allocating CPU task for __cudampi__CPULAUNCHKERNELREQ in stream %d\n", stream);
-          allocateCpuTaskInStream(cpuLaunchKernelTask, *((void **)rdata), stream);
+          allocateCpuTaskInStream(cpuLaunchKernelTask, args, stream);
         }
 
         if (status.MPI_TAG == __cudampi__CPUSTREAMCREATEREQ) {
