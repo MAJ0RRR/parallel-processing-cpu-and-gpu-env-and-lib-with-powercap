@@ -18,8 +18,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <nvml.h>
 #include <omp.h>
 
-#define PROFILING
-
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -77,9 +75,7 @@ float __cudampi__globalpowerlimit;
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 
-#ifdef PROFILING
 unsigned long __cudampi__batches_sent[__CUDAMPI_MAX_THREAD_COUNT];
-#endif
 
 
 unsigned long __cudampi__batch_size;
@@ -383,38 +379,40 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   return 1;
 }
 
-int __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max) { return __cudampi__getnextchunkindex_enableddevices(globalcounter, batchsize, max); }
+__cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max) { return __cudampi__getnextchunkindex_enableddevices(globalcounter, batchsize, max); }
 
-int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max) {
-  // for a given thread (GPU) return the next available data chunk
+__cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max) {
+  // for a given thread return the next available data chunk
   // max is the vector size
-  long long mycounter;
+  __cudampi__batch_pointer batch_pointer = {max, 0};
   int deviceenabled;
 
   omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
   deviceenabled = __cudampi__deviceenabled[__cudampi__currentDevice];
   omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
 
-  if (deviceenabled == 1) {
-
+  if (deviceenabled == 1)
+  {
     #pragma omp critical
     {
-      mycounter = *globalcounter; // handle data from mycounter to mycounter+batchsize-1
-      (*globalcounter) += batchsize;
+      if(*globalcounter < max)
+      {
+        batch_pointer.start = *globalcounter;
+        (*globalcounter) += batchsize;
+      }
     }
-  } else {
-    mycounter = max; // force not giving any more data to the device
+
+    if (batch_pointer.start < max)
+    {
+      batch_pointer.n_elements = (((batch_pointer.start + batchsize) > max )? max - batch_pointer.start : batchsize);
+      __cudampi__batches_sent[omp_get_thread_num()] += 1L;
+    }
   }
 
-#ifdef PROFILING
-  if (mycounter < max) {
-    __cudampi__batches_sent[omp_get_thread_num()] += 1L;
-  }
-#endif
-
-  return mycounter;
+  return batch_pointer;
 }
 
+/*
 int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max) {
   // for a given thread (GPU) return the next available data chunk
   // max is the vector size
@@ -428,6 +426,7 @@ int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned l
 
   return mycounter;
 }
+*/
 
 int __cudampi__isdeviceenabled(int deviceid) {
   int val;
@@ -565,11 +564,9 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
   __cudampi_totaldevicecount = __cudampi_totalcpudevicecount + __cudampi_totalgpudevicecount;
 
-#ifdef PROFILING
   for (int i = 0; i < __cudampi_totaldevicecount;i++){
     __cudampi__batches_sent[i] = 0L;
   }
-#endif
 
   fflush(stdout);
 
@@ -665,11 +662,9 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
 void __cudampi__terminateMPI() {
 
-#ifdef PROFILING
   for (int i = 0; i < __cudampi_totaldevicecount;i++){
     log_message(LOG_INFO, "Batches sent by thread %d: %ld", i, __cudampi__batches_sent[i]);
   }
-#endif
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 

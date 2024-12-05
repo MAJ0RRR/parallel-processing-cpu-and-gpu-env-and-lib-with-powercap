@@ -26,12 +26,20 @@ struct __cudampi__arguments_type
   long long problem_size;
 };
 
+typedef struct
+{
+  long long start;
+  unsigned long n_elements;
+} __cudampi__batch_pointer;
+
 void __cudampi__setglobalpowerlimit(float powerlimit);
 int __cudampi__selectdevicesforpowerlimit_greedy();
 
-int __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max);
-int __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max);
-int __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max);
+__cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max);
+__cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max);
+/*
+__cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max);
+*/
 
 void __cudampi__initializeMPI(int argc, char **argv);
 
