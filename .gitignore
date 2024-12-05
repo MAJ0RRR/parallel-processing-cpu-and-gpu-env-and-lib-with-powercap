@@ -1,3 +1,8 @@
 /cudampilib/build
 .vscode
 *.log
+*.txt
+*.json
+*.png
+/python_scripts/__pycache__/
+/python_scripts/venv/
