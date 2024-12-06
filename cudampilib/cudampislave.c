@@ -44,7 +44,7 @@ int *__cudampi__freeThreadsPerNode;
 
 MPI_Comm *__cudampi__communicators;
 
-int __cudampi_totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
+int __cudampi__totaldevicecount = 0; // how many GPUs in total (on all considered nodes)
 int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
@@ -520,20 +520,20 @@ int main(int argc, char **argv) {
 
   MPI_Allgather(&__cudampi__localFreeThreadCount, 1, MPI_INT, __cudampi__freeThreadsPerNode, 1, MPI_INT, MPI_COMM_WORLD);
 
-  MPI_Bcast(&__cudampi_totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__totaldevicecount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi_totaldevicecount * sizeof(int));
+  __cudampi_targetMPIrankfordevice = (int *)malloc(__cudampi__totaldevicecount * sizeof(int));
   if (!__cudampi_targetMPIrankfordevice) {
     log_message(LOG_ERROR, "\nNot enough memory");
     exit(-1); // we could exit in a nicer way! TBD
   }
 
-  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi_totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(__cudampi_targetMPIrankfordevice, __cudampi__totaldevicecount, MPI_INT, 0, MPI_COMM_WORLD);
 
   // create communicators
   // in the case of the slave we need to go by every GPU and for each GPU there will be a separate GPU shared with the master -- process 0
 
-  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi_totaldevicecount);
+  MPI_Comm *__cudampi__communicators = (MPI_Comm *)malloc(sizeof(MPI_Comm) * __cudampi__totaldevicecount);
   if (!__cudampi__communicators) {
     log_message(LOG_ERROR, "\nNot enough memory for communicators");
     exit(-1); // we could exit in a nicer way! TBD
@@ -541,7 +541,7 @@ int main(int argc, char **argv) {
 
   int commcounter = 0;
 
-  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi_totaldevicecount; i++) {
+  for (int i = __cudampi__GPUcountspernode[0]; i < __cudampi__totaldevicecount; i++) {
 
     int ranks[2] = {0, __cudampi_targetMPIrankfordevice[i]}; // group and communicator between process 0 and the process of the target GPU/device
 
