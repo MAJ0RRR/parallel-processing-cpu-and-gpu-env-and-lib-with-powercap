@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <omp.h>
 
 #define PROFILE_BATCHES
-#define SCALE_CPU_BATCH_SIZE
+// #define SCALE_CPU_BATCH_SIZE
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -63,6 +63,8 @@ int __cudampi__firstIterNumberCpuDevicesMeasured = 0;
 int __cudampi__firstIterDeviceMeasurementStarted[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 int __cudampi__firstIterMeasuredForDevice[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 int __cudampi__cpuBatchSizeScalingDone = 0;
+#else
+int __cudampi__cpuBatchSizeScalingDone = 1;
 #endif
 
 int __cudampi__currentdevice[__CUDAMPI_MAX_THREAD_COUNT]; // current device id for various threads in process 0
@@ -238,7 +240,8 @@ void __cudampi__scaleCpuBatchSize() {
       // Scale cpu batch size by:
       // scalingFactor = gpuBatchTimePerBatch / cpuBatchTimePerBatch
       double scalingFactor = (__cudampi__firstIterTotalGpuBatchTimeSeconds / __cudampi__firstIterTotalGpuBatches) / (__cudampi__firstIterTotalCpuBatchTimeSeconds / __cudampi__firstIterTotalCpuBatches);
-      long long newCpuBatchSize = (long long)((double)(__cudampi__cpu_batch_size)*scalingFactor);
+      // TODO: See if its better to scale from actual CPU value or from default
+      long long newCpuBatchSize = (long long)((double)(__cudampi__default_batch_size)*scalingFactor);
 
       // Make sure that newCpuBatchSize is between 0 and ULONG_MAX. Also assume that CPU batch size can be at most 2x larger than GPU
       if (newCpuBatchSize < 1) {
@@ -664,18 +667,18 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   log_message(LOG_INFO, "Problem Size                       : %lld", __cudampi__arguments.problem_size);
   log_message(LOG_INFO, "Cpu Batch Size Scaling Factor      : %d",   __cudampi__arguments.cpu_batch_scaling_factor);
 
+  __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
   __cudampi__default_batch_size = __cudampi__arguments.batch_size;
   if (__cudampi__arguments.cpu_batch_scaling_factor == 0)
   {
     __cudampi__cpu_batch_size = __cudampi__default_batch_size;
   }
-  else
+  else if (__cudampi__cpu_enabled)
   {
     __cudampi__cpu_batch_size = (unsigned long)(((double)__cudampi__default_batch_size) / ((double)(__cudampi__arguments.cpu_batch_scaling_factor)));
-    log_message(LOG_INFO, "Scaled CPU batch size down from %ld to %ld (factor of %d)",
+    log_message(LOG_INFO, "Scaled CPU batch size down to %ld from %ld (factor of %d)",
                 __cudampi__cpu_batch_size, __cudampi__default_batch_size, __cudampi__arguments.cpu_batch_scaling_factor);
   }
-  __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
 
   // initialize NVML for local GPU
   nvmlReturn_t nvmlResult = nvmlInit();
