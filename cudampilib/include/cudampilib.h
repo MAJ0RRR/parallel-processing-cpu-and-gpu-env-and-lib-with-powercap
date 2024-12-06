@@ -24,6 +24,7 @@ struct __cudampi__arguments_type
   unsigned long batch_size;
   int powercap; // 0 means disabled
   long long problem_size;
+  int cpu_batch_scaling_factor;
 };
 
 typedef struct

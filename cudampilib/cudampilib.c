@@ -102,11 +102,12 @@ extern struct __cudampi__arguments_type __cudampi__arguments;
 static char doc[] = "Cudampi program";
 static char args_doc[] = "";
 static struct argp_option options[] = {
-  { "cpu-enabled",       'c', "ENABLED", 0, "Enable CPU processing (1 to enable, 0 to disable)" },
-  { "number-of-streams", 'n', "NUM",     0, "Set the number of streams" },
-  { "batch-size",        'b', "SIZE",    0, "Set the batch size" },
-  { "powercap",          'p', "WATTS",   0, "Set the power cap (0 to disable)" },
-  { "problem-size",      's', "SIZE",    0, "Set the problem size" },
+  { "cpu-enabled",                   'c',  "ENABLED",           0, "Enable CPU processing (1 to enable, 0 to disable)" },
+  { "number-of-streams",             'n',  "NUM",               0, "Set the number of streams" },
+  { "batch-size",                    'b',  "SIZE",              0, "Set the batch size" },
+  { "powercap",                      'p',  "WATTS",             0, "Set the power cap (0 to disable)" },
+  { "problem-size",                  's',  "SIZE",              0, "Set the problem size" },
+  { "cpu-batch-size-scaling-factor", 'f', "SCALING FACTOR",     0, "Set scaling factor for CPU batch size" },
   { 0 }
 };
 
@@ -299,6 +300,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
       break;
     case 's':
       arguments->problem_size = atoll(arg);
+      break;
+    case 'f':
+      arguments->cpu_batch_scaling_factor = atoi(arg);
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -641,7 +645,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__arguments.number_of_streams = 1;
   __cudampi__arguments.batch_size = 0;
   __cudampi__arguments.powercap = 0;
-  __cudampi__arguments.problem_size = 200000000;
+  __cudampi__arguments.problem_size = 0;
+  __cudampi__arguments.cpu_batch_scaling_factor = 0;
 
   /* Parse our arguments; every option seen by parse_opt will be reflected in arguments. */
   argp_parse(&argp, argc, argv, 0, 0, &__cudampi__arguments);
@@ -652,13 +657,24 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   /* Print parsed arguments using log_message with LOG_INFO level */
-  log_message(LOG_INFO, "CPU Enabled       : %d", __cudampi__arguments.cpu_enabled);
-  log_message(LOG_INFO, "Number of Streams : %d", __cudampi__arguments.number_of_streams);
-  log_message(LOG_INFO, "Batch Size        : %d", __cudampi__arguments.batch_size);
-  log_message(LOG_INFO, "Power Cap         : %d", __cudampi__arguments.powercap);
-  log_message(LOG_INFO, "Problem Size      : %lld", __cudampi__arguments.problem_size);
+  log_message(LOG_INFO, "CPU Enabled                        : %d",   __cudampi__arguments.cpu_enabled);
+  log_message(LOG_INFO, "Number of Streams                  : %d",   __cudampi__arguments.number_of_streams);
+  log_message(LOG_INFO, "Batch Size                         : %d",   __cudampi__arguments.batch_size);
+  log_message(LOG_INFO, "Power Cap                          : %d",   __cudampi__arguments.powercap);
+  log_message(LOG_INFO, "Problem Size                       : %lld", __cudampi__arguments.problem_size);
+  log_message(LOG_INFO, "Cpu Batch Size Scaling Factor      : %d",   __cudampi__arguments.cpu_batch_scaling_factor);
 
-  __cudampi__cpu_batch_size = __cudampi__default_batch_size = __cudampi__arguments.batch_size;
+  __cudampi__default_batch_size = __cudampi__arguments.batch_size;
+  if (__cudampi__arguments.cpu_batch_scaling_factor == 0)
+  {
+    __cudampi__cpu_batch_size = __cudampi__default_batch_size;
+  }
+  else
+  {
+    __cudampi__cpu_batch_size = (unsigned long)(((double)__cudampi__default_batch_size) / ((double)(__cudampi__arguments.cpu_batch_scaling_factor)));
+    log_message(LOG_INFO, "Scaled CPU batch size down from %ld to %ld (factor of %d)",
+                __cudampi__cpu_batch_size, __cudampi__default_batch_size, __cudampi__arguments.cpu_batch_scaling_factor);
+  }
   __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
 
   // initialize NVML for local GPU
