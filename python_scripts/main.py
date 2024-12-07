@@ -70,7 +70,8 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
         number_od_nodes=number_of_nodes,
         number_of_streams=2,
         problem_size=PROBLEM_SIZE,
-        powercap=None
+        powercap=None,
+        initial_cpu_batch_size_scaling=10
     )
     experiment = Experiment(
         description=description,
