@@ -217,7 +217,6 @@ int main(int argc, char **argv)
         __cudampi__deviceSynchronize();
       }
 
-
     } while (!finish);
 
     __cudampi__deviceSynchronize();

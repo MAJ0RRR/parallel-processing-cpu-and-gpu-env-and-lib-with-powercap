@@ -18,6 +18,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <nvml.h>
 #include <omp.h>
 
+#define PROFILE_BATCHES
+// #define SCALE_CPU_BATCH_SIZE
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -51,6 +53,20 @@ int __cudampi__myrank;
 
 double __cudampi__totalEnergyUsed = 0;
 
+#ifdef SCALE_CPU_BATCH_SIZE
+double __cudampi__firstIterTotalGpuBatchTimeSeconds = 0;
+double __cudampi__firstIterTotalCpuBatchTimeSeconds = 0;
+unsigned long __cudampi__firstIterTotalGpuBatches = 0;
+unsigned long __cudampi__firstIterTotalCpuBatches = 0;
+int __cudampi__firstIterNumberGpuDevicesMeasured = 0;
+int __cudampi__firstIterNumberCpuDevicesMeasured = 0;
+int __cudampi__firstIterDeviceMeasurementStarted[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+int __cudampi__firstIterMeasuredForDevice[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+int __cudampi__cpuBatchSizeScalingDone = 0;
+#else
+int __cudampi__cpuBatchSizeScalingDone = 1;
+#endif
+
 int __cudampi__currentdevice[__CUDAMPI_MAX_THREAD_COUNT]; // current device id for various threads in process 0
 
 struct timeval __cudampi__timestart[__CUDAMPI_MAX_THREAD_COUNT]; // start of time measurement
@@ -74,12 +90,50 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
-
-unsigned long __cudampi__batches_sent[__CUDAMPI_MAX_THREAD_COUNT];
-
+#ifdef PROFILE_BATCHES
+unsigned long __cudampi__batches_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+unsigned long long __cudampi__data_points_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+#endif
 
 unsigned long __cudampi__default_batch_size;
 unsigned long __cudampi__cpu_batch_size;
+
+int __cudampi__cpu_enabled;
+extern struct __cudampi__arguments_type __cudampi__arguments;
+
+static char doc[] = "Cudampi program";
+static char args_doc[] = "";
+static struct argp_option options[] = {
+  { "cpu-enabled",                   'c',  "ENABLED",           0, "Enable CPU processing (1 to enable, 0 to disable)" },
+  { "number-of-streams",             'n',  "NUM",               0, "Set the number of streams" },
+  { "batch-size",                    'b',  "SIZE",              0, "Set the batch size" },
+  { "powercap",                      'p',  "WATTS",             0, "Set the power cap (0 to disable)" },
+  { "problem-size",                  's',  "SIZE",              0, "Set the problem size" },
+  { "cpu-batch-size-scaling-factor", 'f', "SCALING FACTOR",     0, "Set scaling factor for CPU batch size" },
+  { 0 }
+};
+
+// Forward declaration for argp definition
+static error_t parse_opt(int key, char *arg, struct argp_state *state);
+
+static struct argp argp = { options, parse_opt, args_doc, doc };
+
+// Counter that holds a unique tag for asynchronously exchanged messages
+// it increments by 2 (D_MSG_TAG) to accomodate data message and status
+int asyncMsgCounter = MIN_ASYNC_MSG_TAG;
+
+typedef struct memcpy_queue_entry {
+    MPI_Request dataRequest;
+    MPI_Request statusRequest;
+    cudaError_t status;
+    TAILQ_ENTRY(memcpy_queue_entry) entries;
+} memcpy_queue_entry_t;
+
+// Define the queue head
+TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
+
+// Declare queues for memcpy operations
+struct memcpy_queue_head __cudampi__memcpy_queues[__CUDAMPI_MAX_THREAD_COUNT];
 
 unsigned long __cudampi__getCurrentBatchSize() {
   unsigned long ret = 0;
@@ -94,19 +148,141 @@ unsigned long __cudampi__getCurrentBatchSize() {
   return ret;
 }
 
-int __cudampi__cpu_enabled;
-extern struct __cudampi__arguments_type __cudampi__arguments;
+// Start measurement of first iteration (between first kernel call and first synchronize call) performance for each device
+// This function starts measurement when first kernel is called and increments amount of processed data with each kernel call
+void __cudampi__recordBatchSizeForDeviceStats(unsigned long batchsize) {
 
-static char doc[] = "Cudampi program";
-static char args_doc[] = "";
-static struct argp_option options[] = {
-  { "cpu-enabled",       'c', "ENABLED", 0, "Enable CPU processing (1 to enable, 0 to disable)" },
-  { "number-of-streams", 'n', "NUM",     0, "Set the number of streams" },
-  { "batch-size",        'b', "SIZE",    0, "Set the batch size" },
-  { "powercap",          'p', "WATTS",   0, "Set the power cap (0 to disable)" },
-  { "problem-size",      's', "SIZE",    0, "Set the problem size" },
-  { 0 }
-};
+#ifdef SCALE_CPU_BATCH_SIZE
+  // If this is the first iteration (deviceSynchronize was not called yet)
+  if (!__cudampi__firstIterMeasuredForDevice[__cudampi__currentDevice]) {
+    // If this is the first call to this function in given thread
+    if (!__cudampi__firstIterDeviceMeasurementStarted[__cudampi__currentDevice]) {
+      // Record time when kernel was first called for this thread
+      __cudampi__firstIterDeviceMeasurementStarted[__cudampi__currentDevice] = 1;
+      __cudampi__timemeasured[__cudampi__currentDevice] = 1;
+      gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);
+    }
+    if (__cudampi__isCpu()) {
+      #pragma omp atomic
+      __cudampi__firstIterTotalCpuBatches += batchsize;
+    } else {
+      #pragma omp atomic
+      __cudampi__firstIterTotalGpuBatches += batchsize;
+    }
+  }
+#endif
+}
+
+// This function will be called after every synchronize call, but will actually only have effect in first call
+void __cudampi__finishDeviceStatsMeasurement(double elapsedTimeSeconds) {
+#ifdef SCALE_CPU_BATCH_SIZE
+  if (!__cudampi__firstIterMeasuredForDevice[__cudampi__currentDevice]) {
+    __cudampi__firstIterMeasuredForDevice[__cudampi__currentDevice] = 1;
+
+    if (!__cudampi__firstIterDeviceMeasurementStarted[__cudampi__currentDevice]) {
+      log_message(LOG_ERROR, "Synchronization before first kernel call. Dynamic batch size scaling won't work.");
+      return;
+    }
+
+    if (__cudampi__isCpu()) {
+      #pragma omp atomic
+      __cudampi__firstIterNumberCpuDevicesMeasured++;
+
+      #pragma omp atomic
+      __cudampi__firstIterTotalCpuBatchTimeSeconds += elapsedTimeSeconds;
+    } else {
+      #pragma omp atomic
+      __cudampi__firstIterNumberGpuDevicesMeasured++;
+
+      #pragma omp atomic
+      __cudampi__firstIterTotalGpuBatchTimeSeconds += elapsedTimeSeconds;
+    }
+  }
+#endif
+}
+
+#ifdef SCALE_CPU_BATCH_SIZE
+// Check if all devices already finished first iteration
+int __cudampi__readyForCpuBatchSizeScaling() {
+  int nCpuMeasured;
+  int nGpuMeasured;
+
+  #pragma omp atomic read
+  nCpuMeasured = __cudampi__firstIterNumberCpuDevicesMeasured;
+
+  #pragma omp atomic read
+  nGpuMeasured = __cudampi__firstIterNumberGpuDevicesMeasured;
+
+  return ((nCpuMeasured >= __cudampi_totalcpudevicecount) && (nGpuMeasured >= __cudampi_totalgpudevicecount));
+}
+#endif
+
+void __cudampi__scaleCpuBatchSize() {
+#ifdef SCALE_CPU_BATCH_SIZE
+  int scalingDone;
+
+  #pragma omp atomic read
+  scalingDone = __cudampi__cpuBatchSizeScalingDone;
+
+  if (scalingDone || (!__cudampi__isCpu()) || (!__cudampi__readyForCpuBatchSizeScaling())) {
+    return;
+  }
+  // Here we are sure that this thread is CPU and first iteration already finished but scaling was not done
+  #pragma omp critical
+  {
+    #pragma omp atomic read
+    scalingDone = __cudampi__cpuBatchSizeScalingDone;
+
+    // Make sure that some thread did not execute scaling between previous check and critical section
+    if (!scalingDone) {
+      // Code below will be executed by first CPU thread that reaches this function after synchronize was called for each device at least once
+
+      // Scale cpu batch size by:
+      // scalingFactor = gpuBatchTimePerBatch / cpuBatchTimePerBatch
+      double scalingFactor = (__cudampi__firstIterTotalGpuBatchTimeSeconds / __cudampi__firstIterTotalGpuBatches) / (__cudampi__firstIterTotalCpuBatchTimeSeconds / __cudampi__firstIterTotalCpuBatches);
+      // TODO: See if its better to scale from actual CPU value or from default
+      long long newCpuBatchSize = (long long)((double)(__cudampi__default_batch_size)*scalingFactor);
+
+      // Make sure that newCpuBatchSize is between 0 and ULONG_MAX. Also assume that CPU batch size can be at most 2x larger than GPU
+      if (newCpuBatchSize < 1) {
+        newCpuBatchSize = 1;
+      } else {
+        if (newCpuBatchSize > (2 * ((long long)__cudampi__cpu_batch_size))) {
+          newCpuBatchSize = 2 * ((long long)__cudampi__cpu_batch_size);
+        }
+
+        if (newCpuBatchSize >= ULONG_MAX) {
+          newCpuBatchSize = ULONG_MAX - 1;
+        }
+      }
+
+      #pragma omp atomic write
+      __cudampi__cpu_batch_size = (unsigned long)newCpuBatchSize;
+
+      // Atomic because other threads might be reading it
+      #pragma omp atomic write
+      __cudampi__cpuBatchSizeScalingDone = 1;
+
+      log_message(LOG_INFO, "Scaling CPU batch size by %lf (new value: %lld)", scalingFactor, newCpuBatchSize);
+    }
+  }
+#endif
+}
+
+int getMsgCounter() {
+  int result;
+  #pragma omp critical
+  {
+    if (asyncMsgCounter >= MAX_ASYNC_MSG_TAG)
+    {
+      asyncMsgCounter = MIN_ASYNC_MSG_TAG;
+    }
+    result = asyncMsgCounter;
+    asyncMsgCounter += D_MSG_TAG;
+  }
+  return result;
+}
+
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
   struct __cudampi__arguments_type *arguments = state->input;
@@ -128,44 +304,14 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 's':
       arguments->problem_size = atoll(arg);
       break;
+    case 'f':
+      arguments->cpu_batch_scaling_factor = atoi(arg);
+      break;
     default:
       return ARGP_ERR_UNKNOWN;
     }
   return 0;
 }
-static struct argp argp = { options, parse_opt, args_doc, doc };
-
-// Counter that holds a unique tag for asynchronously exchanged messages
-// it increments by 2 (D_MSG_TAG) to accomodate data message and status
-int asyncMsgCounter = MIN_ASYNC_MSG_TAG;
-
-int getMsgCounter() {
-  int result;
-  #pragma omp critical
-  {
-    if (asyncMsgCounter >= MAX_ASYNC_MSG_TAG)
-    {
-      asyncMsgCounter = MIN_ASYNC_MSG_TAG;
-    }
-    result = asyncMsgCounter;
-    asyncMsgCounter += D_MSG_TAG;
-  }
-  return result;
-}
-
-typedef struct memcpy_queue_entry {
-    MPI_Request dataRequest;
-    MPI_Request statusRequest;
-    cudaError_t status;
-    TAILQ_ENTRY(memcpy_queue_entry) entries;
-} memcpy_queue_entry_t;
-
-// Define the queue head
-TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
-
-// Declare queues for memcpy operations
-struct memcpy_queue_head __cudampi__memcpy_queues[__CUDAMPI_MAX_THREAD_COUNT];
-
 
 void initiateAsyncRecv(void* dst, unsigned long count, int counter)
 { 
@@ -422,7 +568,10 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *
     if (batch_pointer.start < max)
     {
       batch_pointer.n_elements = (((batch_pointer.start + batchsize) > max )? max - batch_pointer.start : batchsize);
-      __cudampi__batches_sent[omp_get_thread_num()] += 1L;
+      #ifdef PROFILE_BATCHES
+      __cudampi__batches_sent[omp_get_thread_num()] += 1;
+      __cudampi__data_points_sent[omp_get_thread_num()] += batchsize;
+      #endif
     }
   }
 
@@ -446,7 +595,10 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *glob
     if (batch_pointer.start < max)
     {
       batch_pointer.n_elements = (((batch_pointer.start + batchsize) > max )? max - batch_pointer.start : batchsize);
-      __cudampi__batches_sent[omp_get_thread_num()] += 1L;
+      #ifdef PROFILE_BATCHES
+      __cudampi__batches_sent[omp_get_thread_num()] += 1;
+      __cudampi__data_points_sent[omp_get_thread_num()] += batchsize;
+      #endif
     }
 
   return batch_pointer;
@@ -496,7 +648,8 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__arguments.number_of_streams = 1;
   __cudampi__arguments.batch_size = 0;
   __cudampi__arguments.powercap = 0;
-  __cudampi__arguments.problem_size = 200000000;
+  __cudampi__arguments.problem_size = 0;
+  __cudampi__arguments.cpu_batch_scaling_factor = 0;
 
   /* Parse our arguments; every option seen by parse_opt will be reflected in arguments. */
   argp_parse(&argp, argc, argv, 0, 0, &__cudampi__arguments);
@@ -507,14 +660,25 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   /* Print parsed arguments using log_message with LOG_INFO level */
-  log_message(LOG_INFO, "CPU Enabled       : %d", __cudampi__arguments.cpu_enabled);
-  log_message(LOG_INFO, "Number of Streams : %d", __cudampi__arguments.number_of_streams);
-  log_message(LOG_INFO, "Batch Size        : %d", __cudampi__arguments.batch_size);
-  log_message(LOG_INFO, "Power Cap         : %d", __cudampi__arguments.powercap);
-  log_message(LOG_INFO, "Problem Size      : %lld", __cudampi__arguments.problem_size);
+  log_message(LOG_INFO, "CPU Enabled                        : %d",   __cudampi__arguments.cpu_enabled);
+  log_message(LOG_INFO, "Number of Streams                  : %d",   __cudampi__arguments.number_of_streams);
+  log_message(LOG_INFO, "Batch Size                         : %d",   __cudampi__arguments.batch_size);
+  log_message(LOG_INFO, "Power Cap                          : %d",   __cudampi__arguments.powercap);
+  log_message(LOG_INFO, "Problem Size                       : %lld", __cudampi__arguments.problem_size);
+  log_message(LOG_INFO, "Cpu Batch Size Scaling Factor      : %d",   __cudampi__arguments.cpu_batch_scaling_factor);
 
-  __cudampi__cpu_batch_size = __cudampi__default_batch_size = __cudampi__arguments.batch_size;
   __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
+  __cudampi__default_batch_size = __cudampi__arguments.batch_size;
+  if (__cudampi__arguments.cpu_batch_scaling_factor == 0)
+  {
+    __cudampi__cpu_batch_size = __cudampi__default_batch_size;
+  }
+  else if (__cudampi__cpu_enabled)
+  {
+    __cudampi__cpu_batch_size = (unsigned long)(((double)__cudampi__default_batch_size) / ((double)(__cudampi__arguments.cpu_batch_scaling_factor)));
+    log_message(LOG_INFO, "Scaled CPU batch size down to %ld from %ld (factor of %d)",
+                __cudampi__cpu_batch_size, __cudampi__default_batch_size, __cudampi__arguments.cpu_batch_scaling_factor);
+  }
 
   // initialize NVML for local GPU
   nvmlReturn_t nvmlResult = nvmlInit();
@@ -592,10 +756,6 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   __cudampi_totaldevicecount = __cudampi_totalcpudevicecount + __cudampi_totalgpudevicecount;
-
-  for (int i = 0; i < __cudampi_totaldevicecount;i++){
-    __cudampi__batches_sent[i] = 0L;
-  }
 
   fflush(stdout);
 
@@ -691,9 +851,12 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
 void __cudampi__terminateMPI() {
 
+  #ifdef PROFILE_BATCHES
   for (int i = 0; i < __cudampi_totaldevicecount;i++){
     log_message(LOG_INFO, "Batches sent by thread %d: %ld", i, __cudampi__batches_sent[i]);
+    log_message(LOG_INFO, "Data points processed by thread %d: %lld", i, __cudampi__data_points_sent[i]);
   }
+  #endif
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
@@ -942,6 +1105,15 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       __cudampi__totalEnergyUsed += power * time_in_seconds;
     }
     
+    // Check if CPU batch size scaling was already done
+    int scalingDone;
+    #pragma omp atomic read
+    scalingDone = __cudampi__cpuBatchSizeScalingDone;
+
+    if (!scalingDone) {
+      __cudampi__finishDeviceStatsMeasurement(time_in_seconds);
+      __cudampi__scaleCpuBatchSize();
+    }
   } else {
     __cudampi__timemeasured[__cudampi__currentDevice] = 1;
     gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);
@@ -1150,17 +1322,18 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
 
 void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream);
 
-void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
+void __cudampi__cudaKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream) {
+  __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
   if (__cudampi_isLocalGpu) { // run locally
-    launchkernelinstream(devPtr, __cudampi__getCurrentBatchSize(), stream);
+    launchkernelinstream(devPtr, batchsize, stream);
   } else { // launch remotely
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
-    *((unsigned long*)(sdata + sizeof(void *))) = __cudampi__getCurrentBatchSize();
+    *((unsigned long*)(sdata + sizeof(void *))) = batchsize;
     *((cudaStream_t *)(sdata + sizeof(void *) + sizeof(unsigned long))) = stream;
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ, __cudampi__currentCommunicator);
@@ -1170,17 +1343,18 @@ void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream) {
 
 void launchkernel(void *devPtr, unsigned long batchSize);  // extern from .cu
 
-void __cudampi__cudaKernel(void *devPtr) {
+void __cudampi__cudaKernel(void *devPtr, unsigned long batchsize) {
+  __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
   if (__cudampi_isLocalGpu) { // run locally
-    launchkernel(devPtr, __cudampi__getCurrentBatchSize());
+    launchkernel(devPtr, batchsize);
   } else { // launch remotely
 
     size_t ssize = sizeof(void *) + sizeof(unsigned long);
     unsigned char sdata[ssize];
 
     *((void **)sdata) = devPtr;
-    *((unsigned long*)(sdata + sizeof(void *))) = __cudampi__getCurrentBatchSize();
+    *((unsigned long*)(sdata + sizeof(void *))) = batchsize;
 
     MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPILAUNCHCUDAKERNELREQ, __cudampi__currentCommunicator);
 
@@ -1191,23 +1365,23 @@ void __cudampi__cudaKernel(void *devPtr) {
   }
 }
 
-void __cudampi__cpuKernelInStream(void *devPtr, cudaStream_t stream){
-  
+void __cudampi__cpuKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream){
+  __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
   // launch remotely - since master does not use local threads for computations
   size_t ssize = sizeof(void *) + sizeof(unsigned long) + sizeof(cudaStream_t);
   unsigned char sdata[ssize];
 
   *((void **)sdata) = devPtr;
-  *((unsigned long*)(sdata + sizeof(void *))) = __cudampi__getCurrentBatchSize();
+  *((unsigned long*)(sdata + sizeof(void *))) = batchsize;
   *((cudaStream_t *)(sdata + sizeof(void *) + sizeof(unsigned long))) = stream;
 
   MPI_Send((void *)sdata, ssize, MPI_UNSIGNED_CHAR, 1, __cudampi__CPULAUNCHKERNELREQ, __cudampi__currentCommunicator);
   // No need to wait for response since all kernels return void
 }
 
-void __cudampi__cpuKernel(void *devPtr) {
-  __cudampi__cpuKernelInStream(devPtr, NULL);
+void __cudampi__cpuKernel(void *devPtr, unsigned long batchsize) {
+  __cudampi__cpuKernelInStream(devPtr, batchsize, NULL);
 }
 
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
@@ -1330,17 +1504,17 @@ cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cud
 void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream) {
   if (__cudampi__isCpu())
   {
-    return __cudampi__cpuKernelInStream(devPtr, stream);
+    return __cudampi__cpuKernelInStream(devPtr, __cudampi__getCurrentBatchSize(), stream);
   }
   // else
-  return __cudampi__cudaKernelInStream(devPtr, stream);
+  return __cudampi__cudaKernelInStream(devPtr, __cudampi__getCurrentBatchSize(), stream);
 }
 
 void __cudampi__kernel(void *devPtr) {
   if (__cudampi__isCpu())
   {
-    return __cudampi__cpuKernel(devPtr);
+    return __cudampi__cpuKernel(devPtr, __cudampi__getCurrentBatchSize());
   }
   // else
-  return __cudampi__cudaKernel(devPtr);
+  return __cudampi__cudaKernel(devPtr, __cudampi__getCurrentBatchSize());
 }

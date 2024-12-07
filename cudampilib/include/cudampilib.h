@@ -24,6 +24,7 @@ struct __cudampi__arguments_type
   unsigned long batch_size;
   int powercap; // 0 means disabled
   long long problem_size;
+  int cpu_batch_scaling_factor;
 };
 
 typedef struct
@@ -75,11 +76,13 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
 
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream);
 
-void __cudampi__cudaKernel(void *devPtr);
+void __cudampi__cudaKernel(void *devPtr, unsigned long batchsize);
 
-void __cudampi__cudaKernelInStream(void *devPtr, cudaStream_t stream);
+void __cudampi__cudaKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream);
 
-void __cudampi__cpuKernel(void *devPtr);
+void __cudampi__cpuKernel(void *devPtr, unsigned long batchsize);
+
+void __cudampi__cpuKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream);
 
 cudaError_t __cudampi__cudaGetDeviceCount(int *count);
 
@@ -101,4 +104,4 @@ cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cud
 
 void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream);
 
-void __cudampi__kerne(void *devPtr);
+void __cudampi__kernel(void *devPtr);

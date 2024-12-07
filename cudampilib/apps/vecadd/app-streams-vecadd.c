@@ -209,7 +209,7 @@ int main(int argc, char **argv)
       }
 
       privatecounter++;
-      if (privatecounter % 30 == 0) 
+      if (privatecounter % 2 == 0) 
       {
         __cudampi__deviceSynchronize();
       }
