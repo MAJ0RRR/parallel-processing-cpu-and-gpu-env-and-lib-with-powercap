@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 
   #pragma omp parallel num_threads(alldevicescount)
   {
-    long long mycounter;
+    __cudampi__batch_pointer batch_pointer;
     int finish = 0;
     void *devPtra, *devPtrc;
     void *devPtra2, *devPtrc2;
@@ -148,31 +148,31 @@ int main(int argc, char **argv)
     }
     do 
     {
-      mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+      batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
 
-      if (mycounter >= VECTORSIZE) 
+      if (batch_pointer.start >= VECTORSIZE) 
       {
         finish = 1;
       }
       else 
       {
-        __cudampi__memcpyAsync(devPtra, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream1);
+        __cudampi__memcpyAsync(devPtra, vectora + batch_pointer.start, batch_pointer.n_elements * sizeof(double), cudaMemcpyHostToDevice, stream1);
         __cudampi__kernelInStream(devPtr, stream1);
-        __cudampi__memcpyAsync(vectorc + mycounter, devPtrc, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream1);
+        __cudampi__memcpyAsync(vectorc + batch_pointer.start, devPtrc, batch_pointer.n_elements * sizeof(double), cudaMemcpyDeviceToHost, stream1);
 
         if (streamcount == 2) 
         {
-          mycounter = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
+          batch_pointer = __cudampi__getnextchunkindex(&globalcounter, batchsize, VECTORSIZE);
 
-          if (mycounter >= VECTORSIZE) 
+          if (batch_pointer.start >= VECTORSIZE) 
           {
             finish = 1;
           } 
           else 
           {
-            __cudampi__memcpyAsync(devPtra2, vectora + mycounter, batchsize * sizeof(double), cudaMemcpyHostToDevice, stream2);
+            __cudampi__memcpyAsync(devPtra2, vectora + batch_pointer.start, batch_pointer.n_elements * sizeof(double), cudaMemcpyHostToDevice, stream2);
             __cudampi__kernelInStream(devPtr2, stream2);
-            __cudampi__memcpyAsync(vectorc + mycounter, devPtrc2, batchsize * sizeof(double), cudaMemcpyDeviceToHost, stream2);
+            __cudampi__memcpyAsync(vectorc + batch_pointer.start, devPtrc2, batch_pointer.n_elements * sizeof(double), cudaMemcpyDeviceToHost, stream2);
           }
         }
       }
