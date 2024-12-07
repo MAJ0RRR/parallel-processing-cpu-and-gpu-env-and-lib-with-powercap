@@ -35,11 +35,9 @@ typedef struct
 void __cudampi__setglobalpowerlimit(float powerlimit);
 int __cudampi__selectdevicesforpowerlimit_greedy();
 
-__cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, unsigned long batchsize, long long max);
+__cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, long long max);
 __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max);
-/*
 __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max);
-*/
 
 void __cudampi__initializeMPI(int argc, char **argv);
 
