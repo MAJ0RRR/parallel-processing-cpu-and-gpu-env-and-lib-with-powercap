@@ -491,21 +491,29 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
       
       float inverseDeviceEnergyUsed = computeDevPerformance(__cudampi__time_us[i]) / __cudampi__devicepower[i];
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
-          (inverseDeviceEnergyUsed > curperfpower)) {
-        curperfpower = inverseDeviceEnergyUsed;
-        indexselected = i;
-        anydeviceenabled = 1;
+        (inverseDeviceEnergyUsed > curperfpower)) {
+      curperfpower = inverseDeviceEnergyUsed;
+      indexselected = i;
+      anydeviceenabled = 1;
       }
     }
     if (indexselected != (-1)) {
       // enable the found device now
       __cudampi__deviceenabled[__cudampi__currentdevice[indexselected]] = 1;
       if (!managerselected) {
-        managerselected = 1;
-        __cudampi__amimanager[__cudampi__currentdevice[indexselected]] = 1;
+      managerselected = 1;
+      __cudampi__amimanager[__cudampi__currentdevice[indexselected]] = 1;
       }
+      
+      // Log if the selected device is CPU or GPU and how much power it subtracts
+      if (__cudampi__currentdevice[indexselected] >= __cudampi_totalgpudevicecount) {
+      log_message(LOG_INFO, "Selected CPU device %d, subtracted power: %f, inverse device energy used: %f", __cudampi__currentdevice[indexselected], __cudampi__devicepower[__cudampi__currentdevice[indexselected]], curperfpower);
+      } else {
+      log_message(LOG_INFO, "Selected GPU device %d, subtracted power: %f, inverse device energy used: %f", __cudampi__currentdevice[indexselected], __cudampi__devicepower[__cudampi__currentdevice[indexselected]], curperfpower);
+      }
+      
       powerleft -= __cudampi__devicepower[__cudampi__currentdevice[indexselected]];
-      log_message(LOG_DEBUG,"\nSelected device %d", __cudampi__currentdevice[indexselected]);
+      log_message(LOG_INFO, "Remaining power left: %f", powerleft);
     }
   } while (indexselected != (-1));
   fflush(stdout);
@@ -521,6 +529,11 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     if (__cudampi__deviceenabled[__cudampi__currentdevice[i]] != 1) {
       __cudampi__deviceenabled[__cudampi__currentdevice[i]] = 0;
     }
+  }
+
+  // Check if all devices are selected and there is still power left
+  if (powerleft > 0) {
+    log_message(LOG_INFO, "All devices are selected and there is still power left: %f", powerleft);
   }
 
   // unlock the devices' locks
@@ -682,7 +695,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   if (__cudampi__arguments.powercap > 0) {
-    log_message(LOG_INFO, "\nSetting power limit=%f\n", __cudampi__arguments.powercap);
+    log_message(LOG_INFO, "\nSetting power limit=%d\n", __cudampi__arguments.powercap);
     __cudampi__setglobalpowerlimit(__cudampi__arguments.powercap);
   }
 
