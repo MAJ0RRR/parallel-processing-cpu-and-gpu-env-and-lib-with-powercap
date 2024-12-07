@@ -18,8 +18,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <nvml.h>
 #include <omp.h>
 
-#define PROFILE_BATCHES
-// #define SCALE_CPU_BATCH_SIZE
+//#define PROFILE_BATCHES
+#define SCALE_CPU_BATCH_SIZE
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -649,7 +649,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__arguments.batch_size = 0;
   __cudampi__arguments.powercap = 0;
   __cudampi__arguments.problem_size = 0;
-  __cudampi__arguments.cpu_batch_scaling_factor = 0;
+  __cudampi__arguments.cpu_batch_scaling_factor = 10;
 
   /* Parse our arguments; every option seen by parse_opt will be reflected in arguments. */
   argp_parse(&argp, argc, argv, 0, 0, &__cudampi__arguments);
