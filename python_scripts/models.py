@@ -35,6 +35,7 @@ class RunParameters:
     batch_size: int
     powercap: int | None
     problem_size: int
+    initial_cpu_batch_size_scaling: int
 
 
 @dataclass

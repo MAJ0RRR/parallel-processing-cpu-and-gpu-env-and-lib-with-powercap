@@ -25,6 +25,7 @@ struct __cudampi__arguments_type
   int powercap; // 0 means disabled
   long long problem_size;
   int cpu_batch_scaling_factor;
+  int use_dynamic_scaling;
 };
 
 typedef struct

@@ -52,7 +52,7 @@ int main(int argc, char **argv)
   batchsize = __cudampi__arguments.batch_size;
   VECTORSIZE = __cudampi__arguments.problem_size;
 
-  assert(PATTERNSEARCH_THREADS_IN_BLOCK % batchsize == 0);
+  assert(batchsize % PATTERNSEARCH_THREADS_IN_BLOCK == 0);
 
   int alldevicescount = 0;
 
