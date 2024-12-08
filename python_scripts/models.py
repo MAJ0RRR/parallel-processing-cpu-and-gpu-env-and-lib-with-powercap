@@ -24,7 +24,7 @@ def dataclass_from_dict(klass, d):
     except Exception as e:
         print(f"Error while creating dataclass from dict: {e}")
         return d
-    
+
 
 @dataclass
 class RunParameters:
@@ -40,25 +40,31 @@ class RunParameters:
 
 @dataclass
 class SingleRunResult:
-    execution_duration: float # in seconds
-    energy_used: float # in Watts
+    execution_duration: float  # in seconds
+    energy_used: float  # in Watts
 
     @staticmethod
     def from_output(stdout: str, stderr: str) -> "SingleRunResult":
         return SingleRunResult(
-            execution_duration=SingleRunResult.get_execution_duration_from_output(stdout=stdout, stderr=stderr), 
+            execution_duration=SingleRunResult.get_execution_duration_from_output(stdout=stdout, stderr=stderr),
             energy_used=SingleRunResult.get_energy_used_from_output(stdout=stdout, stderr=stderr),
         )
 
     @staticmethod
     def get_execution_duration_from_output(stdout: str, stderr: str):
         main_time_match = re.search(r'Main elapsed time=([\d.]+)', stderr)
+        # print(stderr.split('\n')[-50:])
         return float(main_time_match.group(1))
 
     @staticmethod
     def get_energy_used_from_output(stdout: str, stderr: str):
-        return 0.0
-    
+        total_energy_used = re.search(r'Total energy used ([\d.]+) J', stderr)
+        if total_energy_used:
+            return float(total_energy_used.group(1))
+        else:
+            print('[ERROR] DID NOT MATCH TOTAL ENERGY USED IN OUTPUT')
+            return 0.0
+
 
 @dataclass
 class MultipleRunResult:
@@ -98,4 +104,3 @@ class ExperimentResult:
 class Experiment:
     description: str
     experiment_configurations: list[RunParameters]
-    
