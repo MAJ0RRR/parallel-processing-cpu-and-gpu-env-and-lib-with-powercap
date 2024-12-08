@@ -45,6 +45,7 @@ def time_batch_size_scatter(experiment_result: ExperimentResult):
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_batch_size_nodes_{experiment_result.experiment_result[0].parameters.number_od_nodes}.png')
     plt.close()
 
+
 def time_number_of_nodes_bar(experiment_result: ExperimentResult):
     number_of_nodes = [multiple_run_result.parameters.number_od_nodes for multiple_run_result in experiment_result.experiment_result]
     # "CPU+GPU one stream", "CPU+GPU two streams", "GPU one stream", "GPU two streams"
@@ -67,6 +68,7 @@ def time_number_of_nodes_bar(experiment_result: ExperimentResult):
     plt.tight_layout()
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_nodes.png')
 
+
 def time_number_of_nodes_scatter(experiment_result: ExperimentResult):
     nodes_cpu_gpu_one_stream = [multiple_run_result.parameters.number_od_nodes for multiple_run_result in experiment_result.experiment_result if multiple_run_result.parameters.cpu_enabled and multiple_run_result.parameters.number_of_streams == 1]
     execution_duration_cpu_gpu_one_stream = [multiple_run_result.average("execution_duration") for multiple_run_result in experiment_result.experiment_result if multiple_run_result.parameters.cpu_enabled and multiple_run_result.parameters.number_of_streams == 1] 
@@ -88,3 +90,19 @@ def time_number_of_nodes_scatter(experiment_result: ExperimentResult):
     plt.legend()
     plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_time_nodes_nodes_{experiment_result.experiment_result[0].parameters.number_od_nodes}.png')
     plt.close()
+
+
+def total_energy_used_powercap(experiment_result: ExperimentResult):
+    powercap = [multiple_run_result.parameters.powercap for multiple_run_result in experiment_result.experiment_result]
+    total_energy_used = [multiple_run_result.average("energy_used") for multiple_run_result in
+                         experiment_result.experiment_result]
+
+    plt.figure()
+    plt.plot(powercap, total_energy_used, marker='o')
+    plt.xlabel("powercap")
+    plt.ylabel("total energy used")
+    plt.savefig(f'{experiment_result.experiment_result[0].parameters.app_name}_total_energy_used_powercap.png')
+    plt.close()
+
+    print(
+        f"[INFO] Figure saved in {experiment_result.experiment_result[0].parameters.app_name}_total_energy_used_powercap.png file")
