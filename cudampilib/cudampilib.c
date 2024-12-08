@@ -239,30 +239,25 @@ void __cudampi__scaleCpuBatchSize() {
       // Scale cpu batch size by:
       // scalingFactor = gpuBatchTimePerBatch / cpuBatchTimePerBatch
       double scalingFactor = (__cudampi__firstIterTotalGpuBatchTimeSeconds / __cudampi__firstIterTotalGpuBatches) / (__cudampi__firstIterTotalCpuBatchTimeSeconds / __cudampi__firstIterTotalCpuBatches);
-      // TODO: See if its better to scale from actual CPU value or from default
-      long long newCpuBatchSize = (long long)((double)(__cudampi__default_batch_size)*scalingFactor);
 
-      // Make sure that newCpuBatchSize is between 0 and ULONG_MAX. Also assume that CPU batch size can be at most 2x larger than GPU
-      if (newCpuBatchSize < 1) {
-        newCpuBatchSize = 1;
-      } else {
-        if (newCpuBatchSize > (2 * ((long long)__cudampi__cpu_batch_size))) {
-          newCpuBatchSize = 2 * ((long long)__cudampi__cpu_batch_size);
+      // Don't scale cpu batch size up as it would exceed allocated buffers
+      if (scalingFactor < 1) {
+        long long newCpuBatchSize = (long long)((double)(__cudampi__default_batch_size)*scalingFactor);
+
+        // Make sure that at least one batch is delegated to CPU
+        if (newCpuBatchSize < 1) {
+          newCpuBatchSize = 1;
         }
 
-        if (newCpuBatchSize >= ULONG_MAX) {
-          newCpuBatchSize = ULONG_MAX - 1;
-        }
+        #pragma omp atomic write
+        __cudampi__cpu_batch_size = (unsigned long)newCpuBatchSize;
+
+        log_message(LOG_INFO, "Scaling CPU batch size by %lf (new value: %lld)", scalingFactor, newCpuBatchSize);
       }
-
-      #pragma omp atomic write
-      __cudampi__cpu_batch_size = (unsigned long)newCpuBatchSize;
 
       // Atomic because other threads might be reading it
       #pragma omp atomic write
       __cudampi__cpuBatchSizeScalingDone = 1;
-
-      log_message(LOG_INFO, "Scaling CPU batch size by %lf (new value: %lld)", scalingFactor, newCpuBatchSize);
     }
   }
 }
