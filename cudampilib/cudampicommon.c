@@ -21,10 +21,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define MPI_LOGGING
 #include "logger.h"
 
-float computeDevPerformance(struct timeval period) {
+float computeDevPerformance(double period_us) {
   // period is just the time between two events so compute performance as an inverse
 
-  return 1000000.0 / (period.tv_sec * 1000000 + period.tv_usec);
+  return 1000000.0 / period_us;
 }
 
 float getGPUpower(int gpuid) {
