@@ -18,7 +18,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <nvml.h>
 #include <omp.h>
 
-//#define PROFILE_BATCHES
 #define ENABLE_LOGGING
 #define MPI_LOGGING
 #include "logger.h"
@@ -67,7 +66,7 @@ int __cudampi__currentdevice[__CUDAMPI_MAX_THREAD_COUNT]; // current device id f
 
 struct timeval __cudampi__timestart[__CUDAMPI_MAX_THREAD_COUNT]; // start of time measurement
 struct timeval __cudampi__timestop[__CUDAMPI_MAX_THREAD_COUNT];  // end of time measurement
-struct timeval __cudampi__time[__CUDAMPI_MAX_THREAD_COUNT];      // last time measurement (from start to stop)
+double __cudampi__time_us[__CUDAMPI_MAX_THREAD_COUNT];      // last time measurement (from start to stop)
 int __cudampi__timemeasured[__CUDAMPI_MAX_THREAD_COUNT] = {0};   // whether time measurement started
 float __cudampi__devicepower[__CUDAMPI_MAX_THREAD_COUNT];        // current power taken by a device
 
@@ -86,10 +85,10 @@ float __cudampi__globalpowerlimit;
 
 int powermeasurecounter[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
-#ifdef PROFILE_BATCHES
 unsigned long __cudampi__batches_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 unsigned long long __cudampi__data_points_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
-#endif
+unsigned long __cudampi__last_batches_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
+unsigned long long __cudampi__last_data_points_sent[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 
 unsigned long __cudampi__default_batch_size;
 unsigned long __cudampi__cpu_batch_size;
@@ -490,7 +489,7 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
     indexselected = -1;
     for (i = 0; i < __cudampi_totaldevicecount; i++) {
       
-      float inverseDeviceEnergyUsed = computeDevPerformance(__cudampi__time[i]) / __cudampi__devicepower[i];
+      float inverseDeviceEnergyUsed = computeDevPerformance(__cudampi__time_us[i]) / __cudampi__devicepower[i];
       if (((-1) == (__cudampi__deviceenabled[__cudampi__currentdevice[i]])) && (__cudampi__devicepower[__cudampi__currentdevice[i]] <= powerleft) &&
           (inverseDeviceEnergyUsed > curperfpower)) {
         curperfpower = inverseDeviceEnergyUsed;
@@ -564,10 +563,8 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *
     if (batch_pointer.start < max)
     {
       batch_pointer.n_elements = (((batch_pointer.start + batchsize) > max )? max - batch_pointer.start : batchsize);
-      #ifdef PROFILE_BATCHES
       __cudampi__batches_sent[omp_get_thread_num()] += 1;
       __cudampi__data_points_sent[omp_get_thread_num()] += batchsize;
-      #endif
     }
   }
 
@@ -591,10 +588,8 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *glob
     if (batch_pointer.start < max)
     {
       batch_pointer.n_elements = (((batch_pointer.start + batchsize) > max )? max - batch_pointer.start : batchsize);
-      #ifdef PROFILE_BATCHES
       __cudampi__batches_sent[omp_get_thread_num()] += 1;
       __cudampi__data_points_sent[omp_get_thread_num()] += batchsize;
-      #endif
     }
 
   return batch_pointer;
@@ -850,12 +845,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
 
 void __cudampi__terminateMPI() {
 
-  #ifdef PROFILE_BATCHES
   for (int i = 0; i < __cudampi_totaldevicecount;i++){
     log_message(LOG_INFO, "Batches sent by thread %d: %ld", i, __cudampi__batches_sent[i]);
     log_message(LOG_INFO, "Data points processed by thread %d: %lld", i, __cudampi__data_points_sent[i]);
   }
-  #endif
 
   // finalize the other nodes -> shut down threads responsible for remote GPUs
 
@@ -1079,25 +1072,43 @@ cudaError_t __cudampi__deviceSynchronize(void) {
 
   // record time
   if (__cudampi__timemeasured[__cudampi__currentDevice]) {
+    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+    struct timeval elapsed_time;
     gettimeofday(&(__cudampi__timestop[__cudampi__currentDevice]), NULL);
 
-    omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
-    __cudampi__time[__cudampi__currentDevice].tv_sec = __cudampi__timestop[__cudampi__currentDevice].tv_sec - __cudampi__timestart[__cudampi__currentDevice].tv_sec;    // compute current time
-    __cudampi__time[__cudampi__currentDevice].tv_usec = __cudampi__timestop[__cudampi__currentDevice].tv_usec - __cudampi__timestart[__cudampi__currentDevice].tv_usec; // compute current time
-    struct timeval elapsed_time = __cudampi__time[__cudampi__currentDevice];
-    double time_in_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
-    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
+    // Compute time elapsed
+    elapsed_time.tv_sec = __cudampi__timestop[__cudampi__currentDevice].tv_sec - __cudampi__timestart[__cudampi__currentDevice].tv_sec; 
+    elapsed_time.tv_usec = __cudampi__timestop[__cudampi__currentDevice].tv_usec - __cudampi__timestart[__cudampi__currentDevice].tv_usec;
 
     __cudampi__timestart[__cudampi__currentDevice] = __cudampi__timestop[__cudampi__currentDevice];
+
+    // Convert to seconds and microseconds
+    __cudampi__time_us[__cudampi__currentDevice] = elapsed_time.tv_sec * 1000000 + elapsed_time.tv_usec;
+    double time_in_seconds = __cudampi__time_us[__cudampi__currentDevice] / 1000000.0;
+
+    // Count batches sent from last iteration
+    unsigned long batches_sent = __cudampi__batches_sent[__cudampi__currentDevice] - __cudampi__last_batches_sent[__cudampi__currentDevice];
+    unsigned long long data_points_sent = __cudampi__data_points_sent[__cudampi__currentDevice] - __cudampi__last_data_points_sent[__cudampi__currentDevice];
+    __cudampi__last_batches_sent[__cudampi__currentDevice] = __cudampi__batches_sent[__cudampi__currentDevice];
+    __cudampi__last_data_points_sent[__cudampi__currentDevice] = __cudampi__data_points_sent[__cudampi__currentDevice];
+
+    double scaling_factor = 1;
+    if (batches_sent > 0) {
+      scaling_factor = ((double)data_points_sent) / ((double)(batches_sent * __cudampi__default_batch_size));
+    }
+
+    log_message(LOG_DEBUG, "Scaling factor for power capping = %lf", scaling_factor);
+
+    // Divide time by scaling factor (which is smaller than 1) which means that
+    // if batch size for that device was scaled down, time it would take to process full batch of data is calculated
+    __cudampi__time_us[__cudampi__currentDevice] /= scaling_factor;
 
     if (__cudampi__isCpu() && (energy != -1)){
       power = energy / time_in_seconds;
     }
 
     if (power != (-1)) {
-      omp_set_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
       __cudampi__devicepower[__cudampi__currentDevice] = power;
-      omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
       
       log_message(LOG_DEBUG, "Got power %f with time in seconds = %f", power, time_in_seconds);
       #pragma omp atomic
@@ -1113,6 +1124,8 @@ cudaError_t __cudampi__deviceSynchronize(void) {
       __cudampi__finishDeviceStatsMeasurement(time_in_seconds);
       __cudampi__scaleCpuBatchSize();
     }
+
+    omp_unset_lock(&(__cudampi__devicelocks[__cudampi__currentDevice]));
   } else {
     __cudampi__timemeasured[__cudampi__currentDevice] = 1;
     gettimeofday(&(__cudampi__timestart[__cudampi__currentDevice]), NULL);
