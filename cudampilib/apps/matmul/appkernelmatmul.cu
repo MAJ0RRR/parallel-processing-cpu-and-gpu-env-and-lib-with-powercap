@@ -40,3 +40,5 @@ extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cuda
         log_message(LOG_ERROR, "Error during kernel launch in stream");
     }
 }
+
+extern "C" void launchkernel(void *devPtr, unsigned long batchSize) { launchkernelinstream(devPtr, batchSize, 0); }

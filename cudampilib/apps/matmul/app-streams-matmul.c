@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 
     gettimeofday(&start, NULL);
 
-    #pragma omp parallel num_threads(allDevicesCount)
+#pragma omp parallel num_threads(allDevicesCount)
     {
         // Wątki OpenMP zajmują się różnymi urządzeniami
         __cudampi__batch_pointer batchPointer;
@@ -114,6 +114,6 @@ int main(int argc, char **argv)
 
     gettimeofday(&stopTotal, NULL);
     log_message(LOG_INFO, "Total elapsed time=%f\n", (double)((stopTotal.tv_sec - startTotal.tv_sec) + (double)(stopTotal.tv_usec - startTotal.tv_usec) / 1000000.0));
-    
+
     return 0;
 }
