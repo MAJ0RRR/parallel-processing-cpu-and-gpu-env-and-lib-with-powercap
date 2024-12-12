@@ -21,8 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define ALL_CPU_STREAMS CPU_STREAMS_SUPPORTED + 1
 // number of stream dedicated for sending GPU responses to master
 #define CPU_STREAM_FOR_GPU_RESPONSES CPU_STREAMS_SUPPORTED
-// 1 GB per GPU seems reasonable
-#define INITIAL_GPU_BUFFER_SIZE 1024 * 1024 * 1024
+// 4 GB per GPU seems reasonable
+#define INITIAL_GPU_BUFFER_SIZE 4 * 1024 * 1024 * 1024UL
 
 #define ENABLE_LOGGING
 #define MPI_LOGGING
