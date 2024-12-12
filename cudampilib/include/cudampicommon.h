@@ -15,7 +15,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <omp.h>
 #include <string.h>
 
-float computeDevPerformance(struct timeval period);
+float computeDevPerformance(double period_us);
 
 float getGPUpower(int gpuid);
 
