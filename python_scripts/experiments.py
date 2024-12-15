@@ -19,7 +19,7 @@ def get_arguments(run_parameters: RunParameters):
 def single_app_run(run_parameters: RunParameters) -> SingleRunResult:
     os.chdir(Path.home() / Path("parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib"))
     arguments = get_arguments(run_parameters=run_parameters)
-    command = f"./run_scripts/run-app {run_parameters.app_name} B {run_parameters.number_od_nodes} {arguments}"
+    command = f"./run_scripts/run-app {run_parameters.app_name} B {run_parameters.number_of_nodes} {arguments}"
     print(command)
     try:
         result = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)

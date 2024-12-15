@@ -27,10 +27,10 @@ def experiment_time_nodes(description: str, app_name: str, file_path: str | os.P
             chain.from_iterable(
                 [
                     [
-                        common_run_parameters(cpu_enabled=False, number_of_streams=1, number_od_nodes=i),
-                        common_run_parameters(cpu_enabled=True, number_of_streams=1, number_od_nodes=i),
-                        common_run_parameters(cpu_enabled=False, number_of_streams=2, number_od_nodes=i),
-                        common_run_parameters(cpu_enabled=True, number_of_streams=2, number_od_nodes=i),
+                        common_run_parameters(cpu_enabled=False, number_of_streams=1, number_of_nodes=i),
+                        common_run_parameters(cpu_enabled=True, number_of_streams=1, number_of_nodes=i),
+                        common_run_parameters(cpu_enabled=False, number_of_streams=2, number_of_nodes=i),
+                        common_run_parameters(cpu_enabled=True, number_of_streams=2, number_of_nodes=i),
                     ]
                     for i in [1, 2, 4, 8, 16]
                 ]
@@ -45,7 +45,7 @@ def experiment_time_powercap(description: str, app_name: str, file_path: str | o
         RunParameters,
         app_name=app_name,
         batch_size=51200,
-        number_od_nodes=16,
+        number_of_nodes=16,
         number_of_streams=2,
         problem_size=PROBLEM_SIZE,
         initial_cpu_batch_size_scaling=1,
@@ -71,7 +71,7 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
     common_run_parameters = functools.partial(
         RunParameters,
         app_name=app_name,
-        number_od_nodes=number_of_nodes,
+        number_of_nodes=number_of_nodes,
         number_of_streams=2,
         problem_size=PROBLEM_SIZE,
         powercap=None,
@@ -99,7 +99,7 @@ def experiment_total_energy_used_powercap(description: str, app_name: str, file_
         RunParameters,
         app_name=app_name,
         batch_size=51200,
-        number_od_nodes=3,
+        number_of_nodes=14,
         number_of_streams=2,
         problem_size=PROBLEM_SIZE,
         initial_cpu_batch_size_scaling=1,
@@ -112,7 +112,7 @@ def experiment_total_energy_used_powercap(description: str, app_name: str, file_
                     [
                         common_run_parameters(cpu_enabled=False, powercap=powercap),
                     ]
-                    for powercap in range(100, 200, 100)
+                    for powercap in range(100, 1501, 25)
                 ]
             )
         )
@@ -122,7 +122,7 @@ def experiment_total_energy_used_powercap(description: str, app_name: str, file_
 
 if __name__ == "__main__":
     # run experiments and save results
-    experiment_total_energy_used_powercap(description="total_energy_used(powercap)", app_name="collatz", file_path="collatz_powercap_total_energy_used.json")
+    experiment_total_energy_used_powercap(description="total_energy_used(powercap)", app_name="vecadd", file_path="vecadd_powercap_total_energy_used.json")
 
     # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="collatz", file_path="collatz_time_nodes.json")
     # experiment_time_powercap(description="time(powercap)", app_name="collatz", file_path="collatz_powercap_16_nodes.json")
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     # experiment_time_batch_size(description="time(batch_size)", app_name="collatz", file_path="collatz_batch_size_4_nodes.json", number_of_nodes=4)
 
     # draw charts
-    exp = ExperimentResult.from_file('../cudampilib/collatz_powercap_total_energy_used.json')
+    exp = ExperimentResult.from_file('../cudampilib/vecadd_powercap_total_energy_used.json')
     total_energy_used_powercap(exp)
 
     # exp = ExperimentResult.from_file("../cudampilib/collatz_batch_size_16_nodes.json")

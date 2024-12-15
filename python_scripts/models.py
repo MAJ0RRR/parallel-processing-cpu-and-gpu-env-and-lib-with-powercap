@@ -31,7 +31,7 @@ class RunParameters:
     app_name: str
     cpu_enabled: bool
     number_of_streams: int
-    number_od_nodes: int
+    number_of_nodes: int
     batch_size: int
     powercap: int | None
     problem_size: int
@@ -53,8 +53,11 @@ class SingleRunResult:
     @staticmethod
     def get_execution_duration_from_output(stdout: str, stderr: str):
         main_time_match = re.search(r'Main elapsed time=([\d.]+)', stderr)
-        # print(stderr.split('\n')[-50:])
-        return float(main_time_match.group(1))
+        if main_time_match:
+            return float(main_time_match.group(1))
+        else:
+            print('[ERROR] DID NOT MATCH MAIN ELAPSED TIME IN OUTPUT')
+            return 0.0
 
     @staticmethod
     def get_energy_used_from_output(stdout: str, stderr: str):
