@@ -14,7 +14,8 @@
 
 struct __cudampi__arguments_type __cudampi__arguments;
 
-long long MATRIX_SIZE;
+long long MATRIX_SIZE; 
+int iterations = 1;
 
 double *matrixA;
 double *matrixB;
@@ -25,43 +26,9 @@ long long globalCounter = 0;
 
 int streamCount = 1;
 
-int main(int argc, char **argv)
-{
-    struct timeval start, stop;
-    struct timeval startTotal, stopTotal;
-
-    gettimeofday(&startTotal, NULL);
-
-    __cudampi__initializeMPI(argc, argv);
-
-    streamCount = __cudampi__arguments.number_of_streams;
-    batchSize = __cudampi__arguments.batch_size;
-    MATRIX_SIZE = __cudampi__arguments.problem_size;
-
-    assert(batchSize % MATMUL_THREADS_IN_BLOCK == 0);
-
-    int allDevicesCount = 0;
-
-    __cudampi__getDeviceCount(&allDevicesCount);
-
-    // Przydzielanie pamięci hosta
-    cudaHostAlloc((void **)&matrixA, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
-    cudaHostAlloc((void **)&matrixB, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
-    cudaHostAlloc((void **)&matrixC, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
-
-    // Inicjalizacja danych wejściowych
-    for (size_t i = 0; i < MATRIX_SIZE * MATRIX_SIZE; i++)
+void compute(int allDevicesCount) {
+    #pragma omp parallel num_threads(allDevicesCount)
     {
-        matrixA[i] = ((int)i % 100) * 0.01;
-        matrixB[i] = ((int)i % 50) * 0.02;
-        matrixC[i] = 0.0;
-    }
-
-    gettimeofday(&start, NULL);
-
-#pragma omp parallel num_threads(allDevicesCount)
-    {
-        // Wątki OpenMP zajmują się różnymi urządzeniami
         __cudampi__batch_pointer batchPointer;
         int finish = 0;
         int myThreadID = omp_get_thread_num();
@@ -101,6 +68,66 @@ int main(int argc, char **argv)
         __cudampi__free(devMatrixB);
         __cudampi__free(devMatrixC);
         __cudampi__free(devPointer);
+    }
+}
+
+int main(int argc, char **argv)
+{
+    struct timeval start, stop;
+    struct timeval startTotal, stopTotal;
+
+    gettimeofday(&startTotal, NULL);
+
+    __cudampi__initializeMPI(argc, argv);
+
+    streamCount = __cudampi__arguments.number_of_streams;
+    batchSize = __cudampi__arguments.batch_size;
+    MATRIX_SIZE = __cudampi__arguments.problem_size;
+
+    if (MATRIX_SIZE > 1000) {
+        iterations = MATRIX_SIZE / 1000;
+        MATRIX_SIZE = 1000;
+    }
+
+    assert(batchSize % MATMUL_THREADS_IN_BLOCK == 0);
+
+    int allDevicesCount = 0;
+
+    __cudampi__getDeviceCount(&allDevicesCount);
+
+    log_message(LOG_INFO, "Malloc Matrix");
+
+    cudaError_t err = cudaHostAlloc((void **)&matrixA, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
+
+    if (err != 0) {
+        log_message(LOG_INFO, "Malloc Matrix 1 error %d", err);
+    }
+
+    err = cudaHostAlloc((void **)&matrixB, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
+    if (err != 0) {
+        log_message(LOG_INFO, "Malloc Matrix 2 error %d", err);
+    }
+
+    err = cudaHostAlloc((void **)&matrixC, sizeof(double) * MATRIX_SIZE * MATRIX_SIZE, cudaHostAllocDefault);
+    if (err != 0) {
+        log_message(LOG_INFO, "Malloc Matrix 3 error %d", err);
+    }
+
+    log_message(LOG_INFO, "Malloc Matrix DONE %d", MATRIX_SIZE);
+
+    for (size_t i = 0; i < MATRIX_SIZE * MATRIX_SIZE; i++)
+    {
+        matrixA[i] = ((int)i % 100) * 0.01;
+        matrixB[i] = ((int)i % 50) * 0.02;
+        matrixC[i] = 0.0;
+    }
+
+    log_message(LOG_INFO, "Matrix values generation DONE");
+
+    gettimeofday(&start, NULL);
+
+    for (int i = 0; i < iterations; i++) {
+        compute(allDevicesCount);
     }
 
     gettimeofday(&stop, NULL);
