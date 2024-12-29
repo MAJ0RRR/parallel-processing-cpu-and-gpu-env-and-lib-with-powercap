@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 ENERGY_UJ_FILE = "/sys/class/powercap/intel-rapl:0/energy_uj"
-NUMBER_OF_RUNS = 1
+NUMBER_OF_RUNS = 5
 PROBLEM_SIZE = 960_000_000
 NUMBER_OF_STREAMS = 2
 POWERCAP = 0
@@ -51,18 +51,17 @@ def run_script(command: str):
 if __name__ == "__main__":
     os.chdir(Path.home() / "projekt_badawczy/parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib")
     commands = [
-        f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=1",
-        f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=1",
-        f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        # f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        # f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        # f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        # f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
     ]
     
     for command in commands:
         print(f"[COMMAND] {command}")
         energy_before = read_energy()
-        print(f"Energy before: {energy_before}")
         total_main_elapsed_time = 0
         for _ in range(NUMBER_OF_RUNS):
             stderr_output = run_script(command=command)
@@ -72,7 +71,6 @@ if __name__ == "__main__":
                 continue
             total_main_elapsed_time += elapsed_time
         energy_after = read_energy()
-        print(f"Energy after: {energy_after}")
         print(f"Total main elapsed time: {total_main_elapsed_time}")
-        avg_power = (energy_after - energy_before) / total_main_elapsed_time / NUMBER_OF_RUNS
+        avg_power = (energy_after - energy_before) / total_main_elapsed_time
         print(f"[RESULT] Average power for {command.split(' ')[1]} {command.split(' ')[4]}: {avg_power}")
