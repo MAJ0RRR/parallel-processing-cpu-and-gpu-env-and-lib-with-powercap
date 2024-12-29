@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "mkl.h"
 
 #define ENABLE_LOGGING
 #include "logger.h"
@@ -9,19 +10,15 @@ void matmulkernel(void *devPtr, int rows_a, int cols_a, int cols_b, int num_thre
     double *matB = (double *)(((void **)devPtr)[1]);
     double *matC = (double *)(((void **)devPtr)[2]);
 
-#pragma omp parallel for num_threads(num_threads) collapse(2)
-    for (int i = 0; i < rows_a; i++)
-    {
-        for (int j = 0; j < cols_b; j++)
-        {
-            double sum = 0.0;
-            for (int k = 0; k < cols_a; k++)
-            {
-                sum += matA[i * cols_a + k] * matB[k * cols_b + j];
-            }
-            matC[i * cols_b + j] = sum;
-        }
-    }
+    double alpha = 1.0;
+    double beta = 0.0;
+
+    mkl_set_num_threads(num_threads);
+
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+                rows_a, cols_b, cols_a, 
+                alpha, matA, cols_a, matB, cols_b, 
+                beta, matC, cols_b);
 }
 
 extern void launchcpukernel(void *devPtr, int rows_a, int cols_a, int cols_b, int num_threads)
