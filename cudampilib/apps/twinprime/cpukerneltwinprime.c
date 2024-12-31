@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 
 #define ENABLE_LOGGING
 #include "logger.h"
-#include "twinprimes_defines.h"
+#include "twinprime_defines.h"
 
 int is_prime(int n) {
     if (n < 2) return 0; // Liczby mniejsze niż 2 nie są pierwsze
