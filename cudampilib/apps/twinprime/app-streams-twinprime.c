@@ -28,8 +28,8 @@ struct __cudampi__arguments_type __cudampi__arguments;
 
 long long VECTORSIZE;
 
-char *vectora;
-char *vectorc;
+long long *vector;
+long long *results;
 
 unsigned long batchsize;
 
@@ -52,29 +52,33 @@ int main(int argc, char **argv)
   batchsize = __cudampi__arguments.batch_size;
   VECTORSIZE = __cudampi__arguments.problem_size;
 
-  assert(batchsize % PATTERNSEARCH_THREADS_IN_BLOCK == 0);
+  assert(batchsize % TWINPRIME_THREADS_IN_BLOCK == 0);
 
   int alldevicescount = 0;
 
   __cudampi__getDeviceCount(&alldevicescount);
 
-  cudaHostAlloc((void **)&vectora, sizeof(char) * (VECTORSIZE + PATTERNLENGTH), cudaHostAllocDefault);
-  if (!vectora) 
+  log_message(LOG_INFO, "Malloc vector");
+
+  cudaHostAlloc((void **)&vector, sizeof(long long) * VECTORSIZE, cudaHostAllocDefault);
+  if (!vector) 
   {
     log_message(LOG_ERROR, "\nNot enough memory.");
     exit(-1);
   }
 
-  cudaHostAlloc((void **)&vectorc, sizeof(char) * VECTORSIZE, cudaHostAllocDefault);
-  if (!vectorc) 
+  cudaHostAlloc((void **)&results, sizeof(long long) * VECTORSIZE, cudaHostAllocDefault);
+  if (!results) 
   {
     log_message(LOG_ERROR, "\nNot enough memory.");
     exit(-1);
   }
+
+  log_message(LOG_INFO, "Malloc vector DONE %d", VECTORSIZE);
 
   // Filling input
-  for (long long i = 0; i < (VECTORSIZE + PATTERNLENGTH); i++) {
-    vectora[i] = (1 + i) % 3;
+  for (long long i = 0; i < VECTORSIZE; i++) {
+    vector[i] = i;
   }
 
   gettimeofday(&start, NULL);
@@ -84,28 +88,23 @@ int main(int argc, char **argv)
 
     __cudampi__batch_pointer batch_pointer;
     int finish = 0;
-    void *devPtra, *devPtrc;
-    void *devPtra2, *devPtrc2;
-    int i;
-    cudaStream_t stream1;
-    cudaStream_t stream2;
-    int mythreadid = omp_get_thread_num();
+    void *devVector, *devResults;
     void *devPtr;
-    void *devPtr2;
-    long long privatecounter = 0;
+    cudaStream_t stream;
+    int mythreadid = omp_get_thread_num();
 
     __cudampi__setDevice(mythreadid);
     #pragma omp barrier
 
-    __cudampi__malloc(&devPtra, (batchsize + PATTERNLENGTH) * sizeof(char));
-    if (!devPtra) 
+    __cudampi__malloc(&devVector, (batchsize) * VECTORSIZE * sizeof(long long));
+    if (!devVector) 
     {
       log_message(LOG_ERROR, "\nNot enough memory.");
       exit(-1);
     }
 
-    __cudampi__malloc(&devPtrc, batchsize * sizeof(char));
-    if (!devPtrc) 
+    __cudampi__malloc(&devResults, batchsize * VECTORSIZE * sizeof(long long));
+    if (!devResults) 
     {
       log_message(LOG_ERROR, "\nNot enough memory.");
       exit(-1);
@@ -118,39 +117,10 @@ int main(int argc, char **argv)
       exit(-1);
     }
 
-    if(streamcount == 2)
-    {
-      __cudampi__malloc(&devPtra2, (batchsize + PATTERNLENGTH) * sizeof(char));
-      if (!devPtra2) 
-      {
-        log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(-1);
-      }
-
-      __cudampi__malloc(&devPtrc2, batchsize * sizeof(char));
-      if (!devPtrc2) 
-      {
-        log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(-1);
-      }
-
-      __cudampi__malloc(&devPtr2, 2 * sizeof(void *));
-      if (!devPtr2) 
-      {
-        log_message(LOG_ERROR, "\nNot enough memory.");
-        exit(-1);
-      }
-    }
-
-    __cudampi__streamCreate(&stream1);
-    __cudampi__memcpyAsync(devPtr, &devPtra, sizeof(void *), cudaMemcpyHostToDevice, stream1);
-    __cudampi__memcpyAsync(devPtr + sizeof(void *), &devPtrc, sizeof(void *), cudaMemcpyHostToDevice, stream1);
-    if(streamcount == 2)
-    {
-      __cudampi__streamCreate(&stream2);
-      __cudampi__memcpyAsync(devPtr2, &devPtra2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
-      __cudampi__memcpyAsync(devPtr2 + sizeof(void *), &devPtrc2, sizeof(void *), cudaMemcpyHostToDevice, stream2);
-    }
+    __cudampi__streamCreate(&stream);
+    __cudampi__memcpyAsync(devPtr, &devVector, sizeof(void *), cudaMemcpyHostToDevice, stream);
+    __cudampi__memcpyAsync(devPtr + sizeof(void *), &devResults, sizeof(void *), cudaMemcpyHostToDevice, stream);
+    
     do 
     {
       batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
@@ -159,47 +129,19 @@ int main(int argc, char **argv)
       {
         finish = 1;
       } 
-      else 
-      {
-        __cudampi__memcpyAsync(devPtra, vectora + batch_pointer.start, (batch_pointer.n_elements + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream1);
-        __cudampi__kernelInStream(devPtr, stream1);
-        __cudampi__memcpyAsync(vectorc + batch_pointer.start, devPtrc, batch_pointer.n_elements * sizeof(char), cudaMemcpyDeviceToHost, stream1);
-      if (streamcount == 2)
-        {
-          batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
-          if (batch_pointer.start >= VECTORSIZE) {
-            finish = 1;
-          } 
-          else 
-          {
-            __cudampi__memcpyAsync(devPtra2, vectora + batch_pointer.start, (batch_pointer.n_elements + PATTERNLENGTH) * sizeof(char), cudaMemcpyHostToDevice, stream2);
-            __cudampi__kernelInStream(devPtr2, stream2);
-            __cudampi__memcpyAsync(vectorc + batch_pointer.start, devPtrc2, batch_pointer.n_elements * sizeof(char), cudaMemcpyDeviceToHost, stream2);
-          }
-        }
+      else {
+        __cudampi__memcpyAsync(devVector, vector + batch_pointer.start, batch_pointer.n_elements * sizeof(long long), cudaMemcpyHostToDevice, stream);
+        appkernel<<<batch_pointer.n_elements / TWINPRIME_THREADS_IN_BLOCK, TWINPRIME_THREADS_IN_BLOCK, 0, stream>>>(devPtr);
+        __cudampi__memcpyAsync(results + batch_pointer.start, devResults, batch_pointer.n_elements * sizeof(long long), cudaMemcpyDeviceToHost, stream);
       }
 
-      privatecounter++;
-      if (privatecounter % 2 == 0) 
-      {
-        __cudampi__deviceSynchronize();
-      }
-
+      __cudampi__deviceSynchronize();
     } while (!finish);
 
-    __cudampi__deviceSynchronize();
-
-    __cudampi__streamDestroy(stream1);
+    __cudampi__streamDestroy(stream);
     __cudampi__free(devPtr);
-    __cudampi__free(devPtra);
-    __cudampi__free(devPtrc);
-    if(streamcount == 2)
-    {
-      __cudampi__streamDestroy(stream2);   
-      __cudampi__free(devPtr2);
-      __cudampi__free(devPtra2);
-      __cudampi__free(devPtrc2);
-    }
+    __cudampi__free(devVector);
+    __cudampi__free(devResults);
   }
 
   gettimeofday(&stop, NULL);
@@ -208,9 +150,11 @@ int main(int argc, char **argv)
   __cudampi__terminateMPI();
   // save_vector_output_char(vectorc, VECTORSIZE, "patternsearch_logs_cpugpuasyncfull.log", "CPUGPUASYNC");
 
-  cudaFreeHost(vectora);
-  cudaFreeHost(vectorc);
+  cudaFreeHost(vector);
+  cudaFreeHost(results);
 
   gettimeofday(&stoptotal, NULL);
   log_message(LOG_INFO, "Total elapsed time=%f\n", (double)((stoptotal.tv_sec - starttotal.tv_sec) + (double)(stoptotal.tv_usec - starttotal.tv_usec) / 1000000.0));
+
+  return 0;
 }
