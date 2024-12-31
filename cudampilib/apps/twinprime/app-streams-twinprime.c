@@ -131,7 +131,7 @@ int main(int argc, char **argv)
       } 
       else {
         __cudampi__memcpyAsync(devVector, vector + batch_pointer.start, batch_pointer.n_elements * sizeof(long long), cudaMemcpyHostToDevice, stream);
-        appkernel<<<batch_pointer.n_elements / TWINPRIME_THREADS_IN_BLOCK, TWINPRIME_THREADS_IN_BLOCK, 0, stream>>>(devPtr);
+        __cudampi__kernelInStream(devPtr, stream);
         __cudampi__memcpyAsync(results + batch_pointer.start, devResults, batch_pointer.n_elements * sizeof(long long), cudaMemcpyDeviceToHost, stream);
       }
 
