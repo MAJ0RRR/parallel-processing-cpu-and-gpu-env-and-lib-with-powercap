@@ -27,6 +27,10 @@ def single_app_run(run_parameters: RunParameters) -> SingleRunResult:
         print(f"An error occurred while executing the command: {e}")
         print("Error Output:\n", e.output)
         sys.exit()
+    if "Main elapsed time" not in result.stderr:
+        print("Error encountered when launching application")
+        print(result.stderr)
+
     return SingleRunResult.from_output(stdout=result.stdout, stderr=result.stderr)
 
 

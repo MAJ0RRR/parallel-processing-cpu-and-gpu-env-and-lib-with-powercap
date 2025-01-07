@@ -53,7 +53,9 @@ class SingleRunResult:
     @staticmethod
     def get_execution_duration_from_output(stdout: str, stderr: str):
         main_time_match = re.search(r'Main elapsed time=([\d.]+)', stderr)
-        return float(main_time_match.group(1))
+        ret = float(main_time_match.group(1))
+        print(f"Execution time: {ret}")
+        return ret
 
     @staticmethod
     def get_energy_used_from_output(stdout: str, stderr: str):
