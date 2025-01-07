@@ -512,9 +512,10 @@ int main(int argc, char **argv) {
 
   MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&__cudampi__cpu_power_scaling, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-  assert(__cudampi__cpu_power_scaling > 0.0 && __cudampi__cpu_power_scaling <= 1.0);
 
   if (__cudampi__cpu_enabled){
+      assert(__cudampi__cpu_power_scaling > 0.0 && __cudampi__cpu_power_scaling <= 1.0);
+  
       if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
       log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
       exit(-1);

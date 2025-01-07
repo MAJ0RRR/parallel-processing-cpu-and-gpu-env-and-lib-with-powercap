@@ -671,9 +671,14 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__default_batch_size = __cudampi__arguments.batch_size;
 
   __cudampi__cpu_power_scaling = __cudampi__arguments.cpu_power_scaling;
-  // Check if it's within bounds <0.01 (just some small number); 1.0>
-  if (__cudampi__cpu_power_scaling < 0.01 || __cudampi__cpu_power_scaling >= 1.0)
+  
+  if (__cudampi__cpu_enabled == 0)
   {
+    log_message(LOG_INFO, "Cpu disabled. Setting CPU power scaling to 0.0");
+    __cudampi__cpu_power_scaling = 0.0;
+  } else if (__cudampi__cpu_power_scaling < 0.01 || __cudampi__cpu_power_scaling >= 1.0)
+  {
+    // Check if it's within bounds <0.01 (just some small number); 1.0>
     log_message(LOG_INFO, "Setting CPU power scaling to 1.0");
     __cudampi__cpu_power_scaling = 1.0;
   }
@@ -1138,8 +1143,13 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     // if batch size for that device was scaled down, time it would take to process full batch of data is calculated
     __cudampi__time_us[__cudampi__currentDevice] /= scaling_factor;
 
+    // assert(energy != -1);
     if (__cudampi__isCpu() && (energy != -1)){
       power = energy / time_in_seconds;
+    }
+
+    if (!__cudampi__isCpu() && (energy != -1)) {
+      power += (energy / time_in_seconds);
     }
 
     if (power != (-1)) {
