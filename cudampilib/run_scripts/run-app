@@ -67,7 +67,7 @@ elif [ "$MODE" == "C" ]; then
     mpi_command="mpirun --display-map --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
---rankfile \"$TEMP_HOSTFILE\" \
+--machinefile \"$TEMP_HOSTFILE\" \
 -np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@}"
 
     # Conditionally add slave processes if SLAVE_PROC_AMOUNT > 0
@@ -97,7 +97,7 @@ elif [ "$MODE" == "B" ]; then
     mpi_command="mpirun --display-map --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
---rankfile \"$TEMP_HOSTFILE\" \
+--machinefile \"$TEMP_HOSTFILE\" \
 -np 1 ./$BUILD_DIR/app-streams-$APP_NAME ${@:4}"
 
     # Conditionally add slave processes if SLAVE_PROC_AMOUNT > 0

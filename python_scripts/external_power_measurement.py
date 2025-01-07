@@ -1,3 +1,4 @@
+import paramiko
 import subprocess
 import sys
 import os
@@ -11,18 +12,38 @@ NUMBER_OF_STREAMS = 2
 POWERCAP = 0
 NUMBER_OF_NODES = 2
 
-def read_energy(file_path: str = ENERGY_UJ_FILE):
-    """Reads the energy value from the given file."""
+
+
+def ssh_read_energy(username: str, password: str, host: str = '172.20.83.203', port: int = 22):
+    """Read energy from remote slave node"""
     try:
-        with open(file_path, 'r') as file:
-            return float(file.read())
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.")
-    except PermissionError:
-        print(f"Error: Insufficient permissions to read file '{file_path}'.")
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=host, port=port, username=username, password=password)
+        
+        stdin, stdout, stderr = ssh.exec_command(f"cat {ENERGY_UJ_FILE}")
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+        ssh.close()
+        
+        if error:
+            return f"Error: {error}"
+        return float(output)
     except Exception as e:
-        print(f"Unexpected error reading energy file: {e}")
-    return None
+        return f"An exception occurred: {e}"
+
+# def read_energy(file_path: str = ENERGY_UJ_FILE):
+#     """Reads the energy from master local node."""
+#     try:
+#         with open(file_path, 'r') as file:
+#             return float(file.read())
+#     except FileNotFoundError:
+#         print(f"Error: File '{file_path}' not found.")
+#     except PermissionError:
+#         print(f"Error: Insufficient permissions to read file '{file_path}'.")
+#     except Exception as e:
+#         print(f"Unexpected error reading energy file: {e}")
+#     return None
 
 def read_main_elapsed_time(stderr_output: str):
     match = re.search(r'Main elapsed time=([\d.]+)', stderr_output)
@@ -61,16 +82,13 @@ if __name__ == "__main__":
     
     for command in commands:
         print(f"[COMMAND] {command}")
-        energy_before = read_energy()
+        energy_before = ssh_read_energy(username='', password='')
         total_main_elapsed_time = 0
         for _ in range(NUMBER_OF_RUNS):
             stderr_output = run_script(command=command)
             elapsed_time = read_main_elapsed_time(stderr_output)
-            if elapsed_time is None:
-                print("Skipping this run due to error parsing elapsed time.")
-                continue
             total_main_elapsed_time += elapsed_time
-        energy_after = read_energy()
+        energy_after = ssh_read_energy(username='', password='')
         print(f"Total main elapsed time: {total_main_elapsed_time}")
         avg_power = (energy_after - energy_before) / total_main_elapsed_time
         print(f"[RESULT] Average power for {command.split(' ')[1]} {command.split(' ')[4]}: {avg_power}")
