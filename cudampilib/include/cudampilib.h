@@ -23,7 +23,7 @@ struct __cudampi__arguments_type
   int number_of_streams;
   unsigned long batch_size;
   int powercap; // 0 means disabled
-  long long problem_size;
+  float cpu_power_scaling;
   int cpu_batch_scaling_factor;
   int use_dynamic_scaling;
 };

@@ -17,6 +17,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <sys/queue.h>
 #include <nvml.h>
 #include <omp.h>
+#include <assert.h>
 
 #define ENABLE_LOGGING
 #define MPI_LOGGING
@@ -62,6 +63,10 @@ int __cudampi__firstIterDeviceMeasurementStarted[__CUDAMPI_MAX_THREAD_COUNT] = {
 int __cudampi__firstIterMeasuredForDevice[__CUDAMPI_MAX_THREAD_COUNT] = {0};
 int __cudampi__cpuBatchSizeScalingDone = 0;
 
+float cpuLastEnergyMeasured[MAX_THREADS] = {0.0};
+omp_lock_t cpuEnergyLock[MAX_THREADS];
+int isInitialCpuEnergyMeasured[MAX_THREADS] = {0};
+
 int __cudampi__currentdevice[__CUDAMPI_MAX_THREAD_COUNT]; // current device id for various threads in process 0
 
 struct timeval __cudampi__timestart[__CUDAMPI_MAX_THREAD_COUNT]; // start of time measurement
@@ -92,6 +97,7 @@ unsigned long long __cudampi__last_data_points_sent[__CUDAMPI_MAX_THREAD_COUNT] 
 
 unsigned long __cudampi__default_batch_size;
 unsigned long __cudampi__cpu_batch_size;
+float __cudampi__cpu_power_scaling;
 
 int __cudampi__cpu_enabled;
 extern struct __cudampi__arguments_type __cudampi__arguments;
@@ -103,7 +109,7 @@ static struct argp_option options[] = {
   { "number-of-streams",                 'n',  "NUM",               0, "Set the number of streams" },
   { "batch-size",                        'b',  "SIZE",              0, "Set the batch size" },
   { "powercap",                          'p',  "WATTS",             0, "Set the power cap (0 to disable)" },
-  { "problem-size",                      's',  "SIZE",              0, "Set the problem size" },
+  { "cpu-power-scaling",                 's',  "SCALING FACTOR",    0, "Set the CPU power scaling factor" },
   { "initial-cpu-batch-size-scaling",    'f',  "SCALING FACTOR",    0, "Set initial scaling factor for CPU batch size (0 to disable)" },
   { "disable-dynamic-cpu-batch-scaling",  0,    0,                  0, "Disable dynamic CPU batch size scaling" },
   { 0 }
@@ -294,7 +300,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
       arguments->powercap = atoi(arg);
       break;
     case 's':
-      arguments->problem_size = atoll(arg);
+      arguments->cpu_power_scaling = atof(arg);
       break;
     case 'f':
       arguments->cpu_batch_scaling_factor = atoi(arg);
@@ -639,7 +645,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   __cudampi__arguments.number_of_streams = 1;
   __cudampi__arguments.batch_size = 0;
   __cudampi__arguments.powercap = 0;
-  __cudampi__arguments.problem_size = 0;
+  __cudampi__arguments.cpu_power_scaling = 0.0;
   __cudampi__arguments.cpu_batch_scaling_factor = 0;
   __cudampi__arguments.use_dynamic_scaling = 1;
 
@@ -656,13 +662,22 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   log_message(LOG_INFO, "Number of Streams                          : %d",   __cudampi__arguments.number_of_streams);
   log_message(LOG_INFO, "Batch Size                                 : %d",   __cudampi__arguments.batch_size);
   log_message(LOG_INFO, "Power Cap                                  : %d",   __cudampi__arguments.powercap);
-  log_message(LOG_INFO, "Problem Size                               : %lld", __cudampi__arguments.problem_size);
+  log_message(LOG_INFO, "CPU Power Scaling                          : %f",   __cudampi__arguments.cpu_power_scaling);
   log_message(LOG_INFO, "Initial Cpu Batch Size Scaling Factor      : %d",   __cudampi__arguments.cpu_batch_scaling_factor);
   log_message(LOG_INFO, "Dynamic CPU Batch Size Scaling Enabled     : %d",   __cudampi__arguments.use_dynamic_scaling);
 
   __cudampi__dyanmicCpuBatchSizeScalingEnabled = __cudampi__arguments.use_dynamic_scaling;
   __cudampi__cpu_enabled = __cudampi__arguments.cpu_enabled;
   __cudampi__default_batch_size = __cudampi__arguments.batch_size;
+
+  __cudampi__cpu_power_scaling = __cudampi__arguments.cpu_power_scaling;
+  // Check if it's within bounds <0.01 (just some small number); 1.0>
+  if (__cudampi__cpu_power_scaling < 0.01 || __cudampi__cpu_power_scaling >= 1.0)
+  {
+    log_message(LOG_INFO, "Setting CPU power scaling to 1.0");
+    __cudampi__cpu_power_scaling = 1.0;
+  }
+
   if (__cudampi__arguments.cpu_batch_scaling_factor == 0)
   {
     __cudampi__cpu_batch_size = __cudampi__default_batch_size;
@@ -682,7 +697,7 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 
   if (__cudampi__arguments.powercap > 0) {
-    log_message(LOG_INFO, "\nSetting power limit=%f\n", __cudampi__arguments.powercap);
+    log_message(LOG_INFO, "\nSetting power limit=%d\n", __cudampi__arguments.powercap);
     __cudampi__setglobalpowerlimit(__cudampi__arguments.powercap);
   }
 
@@ -714,8 +729,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
     exit(-1);
   }
 
-  MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  assert(__cudampi__localGpuDeviceCount < MAX_GPU_PER_NODE);
 
+  MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__cpu_power_scaling, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
   MPI_Allgather(&__cudampi__localGpuDeviceCount, 1, MPI_INT, __cudampi__GPUcountspernode, 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -841,6 +858,10 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   for (int i = 0; i < __cudampi_totaldevicecount; i++ ) {
     TAILQ_INIT(&(__cudampi__memcpy_queues[i]));
   }
+
+  for (int i = 0; i < MAX_THREADS; i++) {
+    omp_init_lock(&cpuEnergyLock[i]);
+  }
 }
 
 void __cudampi__terminateMPI() {
@@ -861,6 +882,11 @@ void __cudampi__terminateMPI() {
   if (__cudampi__isglobalpowerlimitset) {
     log_message(LOG_WARN, "Terminating CUDAMPILIB, Total energy used %lf J", __cudampi__totalEnergyUsed);
   }
+  
+  for (int i = 0; i < MAX_THREADS; i++) {
+    omp_destroy_lock(&cpuEnergyLock[i]);
+  }
+
   MPI_Finalize();
 }
 
@@ -1024,20 +1050,28 @@ cudaError_t __cudampi__deviceSynchronize(void) {
   if (__cudampi_isLocalGpu) { // run GPU synchronization locally
 
     // now get power measurement - this should be OK as we assume that computations might be taking place
-
-    power = getGPUpower(__cudampi__currentDevice);
-    log_message(LOG_DEBUG, "Got local GPU power %f", power);
+    if (__cudampi__isglobalpowerlimitset) {
+      cudaError_t error = cudaErrorUnknown;
+      error = getCpuEnergyUsed(&cpuLastEnergyMeasured[omp_get_thread_num()], &energy);
+      if (error != cudaSuccess) {
+        energy = -1;
+      }
+      power = getGPUpower(__cudampi__currentDevice);
+      log_message(LOG_DEBUG, "Got local GPU power %f and CPU energy for this GPU %f", power, energy);
+    }
 
     retVal = cudaDeviceSynchronize();
   } else { // run synchronization remotely
     int targetrank = __cudampi__gettargetMPIrank(__cudampi__currentDevice);
 
     int sdata = __cudampi__isglobalpowerlimitset; // if 0 then means do not measure power, if 1 do measure on the slave side
-    int rsize = sizeof(cudaError_t) + sizeof(float);
-    unsigned char rdata[rsize];
 
+    int rsize = sizeof(cudaError_t) + sizeof(float) + sizeof(float);
+    unsigned char rdata[rsize];
     if (__cudampi__isCpu())
     {
+      rsize = sizeof(cudaError_t) + sizeof(float);
+
       MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPICPUDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
       // receive an error message and a float representing power consumption
@@ -1054,14 +1088,15 @@ cudaError_t __cudampi__deviceSynchronize(void) {
     {
       MPI_Send(&sdata, 1, MPI_INT, 1, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__currentCommunicator);
 
-      // receive an error message and a float representing power consumption
+      // receive an error message and a float representing power consumption for GPU and float with energy used by CPU (scaled down)
 
       MPI_Recv(rdata, rsize, MPI_UNSIGNED_CHAR, 1, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__currentCommunicator, NULL);
 
       // decode and store power consumption for the device
 
       power = *((float *)(rdata + sizeof(cudaError_t)));
-      log_message(LOG_DEBUG, "Got remote GPU power %f", power);
+      energy = *((float *)(rdata + sizeof(cudaError_t) + sizeof(float)));
+      log_message(LOG_DEBUG, "Got remote GPU power %f and CPU energy for this GPU %f", power, energy);
     }
     process_queue();
 
@@ -1338,6 +1373,7 @@ void __cudampi__cudaKernelInStream(void *devPtr, unsigned long batchsize, cudaSt
   __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
   if (__cudampi_isLocalGpu) { // run locally
+    initializeCpuEnergyMeasurement(isInitialCpuEnergyMeasured, cpuEnergyLock, cpuLastEnergyMeasured);
     launchkernelinstream(devPtr, batchsize, stream);
   } else { // launch remotely
 
@@ -1359,6 +1395,7 @@ void __cudampi__cudaKernel(void *devPtr, unsigned long batchsize) {
   __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
   if (__cudampi_isLocalGpu) { // run locally
+    initializeCpuEnergyMeasurement(isInitialCpuEnergyMeasured, cpuEnergyLock, cpuLastEnergyMeasured);
     launchkernel(devPtr, batchsize);
   } else { // launch remotely
 

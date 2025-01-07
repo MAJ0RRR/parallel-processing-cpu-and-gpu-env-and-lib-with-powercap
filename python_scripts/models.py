@@ -34,7 +34,7 @@ class RunParameters:
     number_od_nodes: int
     batch_size: int
     powercap: int | None
-    problem_size: int
+    cpu_power_scaling: float | None
     initial_cpu_batch_size_scaling: int
 
 
