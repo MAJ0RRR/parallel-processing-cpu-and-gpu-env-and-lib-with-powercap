@@ -6,15 +6,19 @@ import re
 from pathlib import Path
 
 ENERGY_UJ_FILE = "/sys/class/powercap/intel-rapl:0/energy_uj"
-NUMBER_OF_RUNS = 5
+NUMBER_OF_RUNS = 1
 PROBLEM_SIZE = 960_000_000
 NUMBER_OF_STREAMS = 2
 POWERCAP = 0
 NUMBER_OF_NODES = 2
 
+SSH_USER_NAME = ''
+SSH_PASSWORD = ''
+SSH_HOST = '172.20.83.213'
 
 
-def ssh_read_energy(username: str, password: str, host: str = '172.20.83.203', port: int = 22):
+
+def ssh_read_energy(username: str, password: str, host: str = SSH_HOST, port: int = 22):
     """Read energy from remote slave node"""
     try:
         ssh = paramiko.SSHClient()
@@ -74,21 +78,23 @@ if __name__ == "__main__":
     commands = [
         f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
         f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        # f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        # f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=600000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        # f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        # f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=6000000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=48000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=48000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
     ]
     
     for command in commands:
         print(f"[COMMAND] {command}")
-        energy_before = ssh_read_energy(username='', password='')
+        energy_before = ssh_read_energy(username=SSH_USER_NAME, password=SSH_PASSWORD)
+        print(f"ENERGY BEFORE: {energy_before}")
         total_main_elapsed_time = 0
-        for _ in range(NUMBER_OF_RUNS):
+        for i in range(NUMBER_OF_RUNS):
+            print(f"RUN: {i}")
             stderr_output = run_script(command=command)
             elapsed_time = read_main_elapsed_time(stderr_output)
             total_main_elapsed_time += elapsed_time
-        energy_after = ssh_read_energy(username='', password='')
+        energy_after = ssh_read_energy(username=SSH_USER_NAME, password=SSH_PASSWORD)
         print(f"Total main elapsed time: {total_main_elapsed_time}")
         avg_power = (energy_after - energy_before) / total_main_elapsed_time
         print(f"[RESULT] Average power for {command.split(' ')[1]} {command.split(' ')[4]}: {avg_power}")
