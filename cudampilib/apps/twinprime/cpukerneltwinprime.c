@@ -20,22 +20,27 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "logger.h"
 #include "twinprime_defines.h"
 
-int is_prime(int n) {
-    if (n < 2) return 0; // Liczby mniejsze niż 2 nie są pierwsze
-    for (int i = 2; i <= sqrt(n); i++) { // Sprawdzamy dzielniki do pierwiastka z n
-        if (n % i == 0) return 0; // Jeśli jest dzielnik, to liczba nie jest pierwsza
+int isprime(long long a) 
+{
+  long long i;
+  for (i = 2; i < sqrt((double)a) + 1; i++) 
+  {
+    if ((a % i) == 0) 
+    {
+      return 0;
     }
-    return 1; // Liczba jest pierwsza
+  }
+  return 1;
 }
 
-void appkernel(void *devPtr, int num_elements, int num_threads) 
+void appkernel(void *devPtr, long long num_elements, int num_threads) 
 {
-    int *output = (int *)devPtr; // Tablica wyjściowa przechowująca wyniki
+    long long *output = (long long *)(((void **)devPtr)[0]);
 
     #pragma omp parallel for num_threads(num_threads)
-    for (int i = 0; i < num_elements; i++) {
+    for (long long i = 0; i < num_elements; i++) {
         // Sprawdzanie liczb bliźniaczych
-        if (is_prime(i) && is_prime(i + 2)) {
+        if (isprime(i) && isprime(i + 2)) {
             output[i] = 1; // Para bliźniaczych istnieje
         } else {
             output[i] = 0; // Brak pary
@@ -45,7 +50,7 @@ void appkernel(void *devPtr, int num_elements, int num_threads)
 
 extern void launchcpukernel(void *devPtr, unsigned long batchSize, int num_threads) 
 {
-  int num_elements = batchSize;
+  long long num_elements = batchSize;
   log_message(LOG_DEBUG, "Launichng CPU Kernel with %i elements and %i threads.", num_elements, num_threads);
   appkernel(devPtr, num_elements, num_threads);
 }

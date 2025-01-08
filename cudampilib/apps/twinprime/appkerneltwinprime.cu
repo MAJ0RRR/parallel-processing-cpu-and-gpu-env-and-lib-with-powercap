@@ -23,20 +23,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include "logger.h"
 #include "twinprime_defines.h"
 
-__device__ int is_prime(int n) {
-  if (n < 2) return 0;
-  for (int i = 2; i * i <= n; i++) {
-      if (n % i == 0) return 0;
+__device__ int isprime(long long a) 
+{
+  long long i;
+  for (i = 2; i < sqrt((double)a) + 1; i++) 
+  {
+    if ((a % i) == 0) 
+    {
+      return 0;
+    }
   }
   return 1;
 }
 
 __global__ void appkernel(void *devPtr) {
-  int *output = (int *)(((void **)devPtr)[0]); // Wyjście: tablica wyników
+  long long *output = (long long *)(((void **)devPtr)[0]);
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
-
   // Sprawdzenie liczb bliźniaczych
-  if (is_prime(my_index) && is_prime(my_index + 2)) {
+  if (isprime(my_index) && isprime(my_index + 2)) {
       output[my_index] = 1; // Para bliźniaczych
   } else {
       output[my_index] = 0; // Brak pary
