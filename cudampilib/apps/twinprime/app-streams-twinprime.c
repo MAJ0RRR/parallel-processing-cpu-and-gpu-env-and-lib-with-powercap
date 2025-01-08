@@ -77,8 +77,9 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Malloc vector DONE %d", VECTORSIZE);
 
   // Filling input
+  long long value = 1000000; 
   for (long long i = 0; i < VECTORSIZE; i++) {
-    vector[i] = i;
+    vector[i] = value + i;
   }
 
   gettimeofday(&start, NULL);
@@ -193,6 +194,8 @@ int main(int argc, char **argv)
         __cudampi__deviceSynchronize();
       }
     } while (!finish);
+
+    // __cudampi__deviceSynchronize();
 
     __cudampi__streamDestroy(stream);
 
