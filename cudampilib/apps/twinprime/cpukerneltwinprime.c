@@ -35,12 +35,13 @@ int isprime(long long a)
 
 void appkernel(void *devPtr, long long num_elements, int num_threads) 
 {
-    long long *output = (long long *)(((void **)devPtr)[0]);
+    long long *input = (long long *)(((void **)devPtr)[0]);
+    long long *output = (long long *)(((void **)devPtr)[1]);
 
     #pragma omp parallel for num_threads(num_threads)
     for (long long i = 0; i < num_elements; i++) {
         // Sprawdzanie liczb bliźniaczych
-        if (isprime(i) && isprime(i + 2)) {
+        if (isprime(input[i]) && isprime(input[i + 2]) && (input[i] != input[i + 2])) {
             output[i] = 1; // Para bliźniaczych istnieje
         } else {
             output[i] = 0; // Brak pary

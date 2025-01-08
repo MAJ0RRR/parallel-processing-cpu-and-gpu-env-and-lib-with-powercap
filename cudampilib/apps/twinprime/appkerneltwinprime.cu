@@ -37,13 +37,18 @@ __device__ int isprime(long long a)
 }
 
 __global__ void appkernel(void *devPtr) {
-  long long *output = (long long *)(((void **)devPtr)[0]);
+  long long *input = (long long *)(((void **)devPtr)[0]);
+  long long *output = (long long *)(((void **)devPtr)[1]);
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
+
   // Sprawdzenie liczb bliźniaczych
-  if (isprime(my_index) && isprime(my_index + 2)) {
+
+  if (isprime(input[my_index]) && isprime(input[my_index + 2]) && (input[my_index] != input[my_index + 2])) {
       output[my_index] = 1; // Para bliźniaczych
+      // printf("Thread %d (Block %d) - Twin primes found: (%lld, %lld)\n", threadIdx.x, blockIdx.x, input[my_index], input[my_index + 2]);
   } else {
       output[my_index] = 0; // Brak pary
+      // printf("Thread %d (Block %d) - No twin primes: (%lld, %lld)\n", threadIdx.x, blockIdx.x, my_index, my_index + 2);
   }
 }
 
