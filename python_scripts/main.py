@@ -110,6 +110,10 @@ if __name__ == "__main__":
     experiment_time_batch_size(description="time(batch_size)", app_name="collatz", file_path="collatz_batch_size_8_nodes.json", number_of_nodes=8)
     experiment_time_batch_size(description="time(batch_size)", app_name="collatz", file_path="collatz_batch_size_4_nodes.json", number_of_nodes=4)
 
+    experiment_time_batch_size(description="time(batch_size)", app_name="twinprime", file_path="twinprime_batch_size_16_nodes.json", number_of_nodes=16)
+    experiment_time_batch_size(description="time(batch_size)", app_name="twinprime", file_path="twinprime_batch_size_8_nodes.json", number_of_nodes=8)
+    experiment_time_batch_size(description="time(batch_size)", app_name="twinprime", file_path="twinprime_batch_size_4_nodes.json", number_of_nodes=4)
+
     exp = ExperimentResult.from_file("../cudampilib/collatz_batch_size_16_nodes.json")
     time_batch_size_scatter(exp)
     exp = ExperimentResult.from_file("../cudampilib/collatz_batch_size_8_nodes.json")
@@ -136,6 +140,13 @@ if __name__ == "__main__":
     exp = ExperimentResult.from_file("../cudampilib/patternsearch_batch_size_8_nodes.json")
     time_batch_size_scatter(exp)
     exp = ExperimentResult.from_file("../cudampilib/patternsearch_batch_size_4_nodes.json")
+    time_batch_size_scatter(exp)
+
+    exp = ExperimentResult.from_file("../cudampilib/twinprime_batch_size_16_nodes.json")
+    time_batch_size_scatter(exp)
+    exp = ExperimentResult.from_file("../cudampilib/twinprime_batch_size_8_nodes.json")
+    time_batch_size_scatter(exp)
+    exp = ExperimentResult.from_file("../cudampilib/twinprime_batch_size_4_nodes.json")
     time_batch_size_scatter(exp)
 
 
