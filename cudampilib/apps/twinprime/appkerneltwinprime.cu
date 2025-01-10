@@ -36,24 +36,24 @@ __device__ int isprime(long long a)
   return 1;
 }
 
-__global__ void appkernel(void *devPtr) {
+__global__ void appkernel(void *devPtr) 
+{
   long long *input = (long long *)(((void **)devPtr)[0]);
   long long *output = (long long *)(((void **)devPtr)[1]);
   long my_index = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Sprawdzenie liczb bliźniaczych
-
-  if (isprime(input[my_index]) && isprime(input[my_index + 2]) && (input[my_index] != input[my_index + 2])) {
-      output[my_index] = 1; // Para bliźniaczych
-      // printf("Thread %d (Block %d) - Twin primes found: (%lld, %lld)\n", threadIdx.x, blockIdx.x, input[my_index], input[my_index + 2]);
-  } else {
-      output[my_index] = 0; // Brak pary
-      // printf("Thread %d (Block %d) - No twin primes: (%lld, %lld)\n", threadIdx.x, blockIdx.x, my_index, my_index + 2);
+  if (isprime(input[my_index]) && isprime(input[my_index + 2]) && (input[my_index] != input[my_index + 2])) 
+  {
+      output[my_index] = 1;
+  } 
+  else 
+  {
+      output[my_index] = 0;
   }
 }
 
-extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream) {
-
+extern "C" void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream) 
+{
   dim3 blocksingrid(batchSize / TWINPRIME_THREADS_IN_BLOCK);
   dim3 threadsinblock(TWINPRIME_THREADS_IN_BLOCK);
 

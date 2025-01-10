@@ -194,8 +194,6 @@ int main(int argc, char **argv)
       }
     } while (!finish);
 
-    // __cudampi__deviceSynchronize();
-
     __cudampi__streamDestroy(stream);
 
     __cudampi__free(devPtr);

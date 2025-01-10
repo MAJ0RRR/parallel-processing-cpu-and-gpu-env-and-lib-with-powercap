@@ -39,12 +39,13 @@ void appkernel(void *devPtr, long long num_elements, int num_threads)
     long long *output = (long long *)(((void **)devPtr)[1]);
 
     #pragma omp parallel for num_threads(num_threads)
-    for (long long i = 0; i < num_elements; i++) {
-        // Sprawdzanie liczb bliźniaczych
-        if (isprime(input[i]) && isprime(input[i + 2]) && (input[i] != input[i + 2])) {
-            output[i] = 1; // Para bliźniaczych istnieje
+    for (long long i = 0; i < num_elements; i++) 
+    {
+        if (isprime(input[i]) && isprime(input[i + 2]) && (input[i] != input[i + 2])) 
+        {
+            output[i] = 1;
         } else {
-            output[i] = 0; // Brak pary
+            output[i] = 0;
         }
     }
 }
