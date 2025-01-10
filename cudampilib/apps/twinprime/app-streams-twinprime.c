@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 
   streamcount = __cudampi__arguments.number_of_streams;
   batchsize = __cudampi__arguments.batch_size;
-  VECTORSIZE = __cudampi__arguments.problem_size;
+  VECTORSIZE = TWINPRIME_PROBLEM_SIZE;
 
   assert(batchsize % TWINPRIME_THREADS_IN_BLOCK == 0);
 
@@ -77,9 +77,8 @@ int main(int argc, char **argv)
   log_message(LOG_INFO, "Malloc vector DONE %d", VECTORSIZE);
 
   // Filling input
-  long long value = 1000000; 
   for (long long i = 0; i < VECTORSIZE; i++) {
-    vector[i] = value + i;
+    vector[i] = 1000000 + i;
   }
 
   gettimeofday(&start, NULL);
