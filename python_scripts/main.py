@@ -15,9 +15,10 @@ def experiment_time_nodes(description: str, app_name: str, file_path: str | os.P
     common_run_parameters = functools.partial(
         RunParameters,
         app_name=app_name,
-        batch_size=50000,
+        batch_size=480000,
         powercap=None,
         problem_size=PROBLEM_SIZE,
+        initial_cpu_batch_size_scaling=100
     )
     experiment = Experiment(
         description=description,
@@ -93,6 +94,9 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
 if __name__ == "__main__":
     # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="collatz", file_path="collatz_time_nodes.json")
     # experiment_time_powercap(description="time(powercap)", app_name="collatz", file_path="collatz_powercap_16_nodes.json")
+
+    experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="twinprime", file_path="twinprime_time_nodes.json")
+    experiment_time_powercap(description="time(powercap)", app_name="twinprime", file_path="twinprime_powercap_16_nodes.json")
     
     experiment_time_batch_size(description="time(batch_size)", app_name="vecadd", file_path="vecadd_batch_size_16_nodes.json", number_of_nodes=16)
     experiment_time_batch_size(description="time(batch_size)", app_name="vecadd", file_path="vecadd_batch_size_8_nodes.json", number_of_nodes=8)
