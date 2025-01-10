@@ -153,6 +153,11 @@ if __name__ == "__main__":
     exp = ExperimentResult.from_file("../cudampilib/twinprime_batch_size_4_nodes.json")
     time_batch_size_scatter(exp)
 
+    exp = ExperimentResult.from_file("../python_scripts/twinprime_time_nodes.json")
+    time_number_of_nodes_bar(exp)
+    time_number_of_nodes_scatter(exp)
+    exp = ExperimentResult.from_file("../python_scripts/twinprime_powercap_16_nodes.json")
+    time_powercap_scatter(exp)
 
     # exp = ExperimentResult.from_file("../python_scripts/collatz_time_nodes.json")
     # time_number_of_nodes_bar(exp)
