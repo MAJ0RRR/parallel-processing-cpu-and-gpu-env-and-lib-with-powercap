@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 ENERGY_UJ_FILE = "/sys/class/powercap/intel-rapl:0/energy_uj"
-NUMBER_OF_RUNS = 1
+NUMBER_OF_RUNS = 10
 PROBLEM_SIZE = 960_000_000
 NUMBER_OF_STREAMS = 2
 POWERCAP = 0
@@ -14,7 +14,7 @@ NUMBER_OF_NODES = 2
 
 SSH_USER_NAME = ''
 SSH_PASSWORD = ''
-SSH_HOST = '172.20.83.213'
+SSH_HOST = '172.20.83.215'
 
 
 
@@ -74,14 +74,18 @@ def run_script(command: str):
         sys.exit(1)
 
 if __name__ == "__main__":
-    os.chdir(Path.home() / "projekt_badawczy/parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib")
+    os.chdir(Path.home() / "parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib")
     commands = [
         f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
         f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
         f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=48000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
         f"./run_scripts/run-app vecadd B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=48000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
-        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=960000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app vecmaxdiv B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=960000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app patternsearch B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=960000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app patternsearch B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=960000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
+        f"./run_scripts/run-app rnn B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=100 --powercap={POWERCAP} --problem-size=4000 --initial-cpu-batch-size-scaling=0",
+        f"./run_scripts/run-app rnn B {NUMBER_OF_NODES} --cpu-enabled=1 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=100 --powercap={POWERCAP} --problem-size=4000 --initial-cpu-batch-size-scaling=0",
     ]
     
     for command in commands:
@@ -94,7 +98,5 @@ if __name__ == "__main__":
             stderr_output = run_script(command=command)
             elapsed_time = read_main_elapsed_time(stderr_output)
             total_main_elapsed_time += elapsed_time
-        energy_after = ssh_read_energy(username=SSH_USER_NAME, password=SSH_PASSWORD)
+            print(f"After run {i}. Elapsed time {elapsed_time}, energy used: {ssh_read_energy(username=SSH_USER_NAME, password=SSH_PASSWORD)}")
         print(f"Total main elapsed time: {total_main_elapsed_time}")
-        avg_power = (energy_after - energy_before) / total_main_elapsed_time
-        print(f"[RESULT] Average power for {command.split(' ')[1]} {command.split(' ')[4]}: {avg_power}")

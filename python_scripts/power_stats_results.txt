@@ -1,0 +1,242 @@
+MAX_ENERGY_RANGE = 262143328850
+
+[COMMAND] ./run_scripts/run-app collatz B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=480000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 252457261605.0
+RUN: 0
+After run 0. Elapsed time 60.547933, energy used: 256134597650.0
+RUN: 1
+After run 1. Elapsed time 60.641486, energy used: 259778371647.0
+RUN: 2
+After run 2. Elapsed time 60.74658, energy used: 1356707769.0
+RUN: 3
+After run 3. Elapsed time 60.508485, energy used: 5043208036.0
+RUN: 4
+After run 4. Elapsed time 60.311307, energy used: 8752160821.0
+RUN: 5
+After run 5. Elapsed time 60.320065, energy used: 12427645614.0
+RUN: 6
+After run 6. Elapsed time 60.346691, energy used: 16075664778.0
+RUN: 7
+After run 7. Elapsed time 60.330635, energy used: 19768506399.0
+RUN: 8
+After run 8. Elapsed time 60.315251, energy used: 23475988973.0
+RUN: 9
+After run 9. Elapsed time 60.313916, energy used: 27189005469.0
+Total main elapsed time: 604.382349
+[RESULT] Average power for collatz --cpu-enabled=0: -372717322.1499889
+[COMMAND] ./run_scripts/run-app collatz B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=480000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 27197583938.0
+RUN: 0
+After run 0. Elapsed time 48.658975, energy used: 35829323926.0
+RUN: 1
+After run 1. Elapsed time 48.702179, energy used: 44497466652.0
+RUN: 2
+After run 2. Elapsed time 48.724825, energy used: 53090024611.0
+RUN: 3
+After run 3. Elapsed time 48.734041, energy used: 61691055998.0
+RUN: 4
+After run 4. Elapsed time 48.723696, energy used: 70225674652.0
+RUN: 5
+After run 5. Elapsed time 48.816886, energy used: 78543921241.0
+RUN: 6
+After run 6. Elapsed time 48.763995, energy used: 86968025652.0
+RUN: 7
+After run 7. Elapsed time 48.840325, energy used: 95417204400.0
+RUN: 8
+After run 8. Elapsed time 48.744774, energy used: 103920466384.0
+RUN: 9
+After run 9. Elapsed time 48.67842, energy used: 112368249506.0
+Total main elapsed time: 487.388116
+[RESULT] Average power for collatz --cpu-enabled=1: 174759423.98644778
+[COMMAND] ./run_scripts/run-app vecadd B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=48000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 112378008454.0
+RUN: 0
+After run 0. Elapsed time 0.851895, energy used: 112672114207.0
+RUN: 1
+After run 1. Elapsed time 0.849519, energy used: 112992124435.0
+RUN: 2
+After run 2. Elapsed time 0.842886, energy used: 113276789295.0
+RUN: 3
+After run 3. Elapsed time 0.845425, energy used: 113561685050.0
+RUN: 4
+After run 4. Elapsed time 0.843949, energy used: 113868228943.0
+RUN: 5
+After run 5. Elapsed time 0.843426, energy used: 114149772961.0
+RUN: 6
+After run 6. Elapsed time 0.84777, energy used: 114432901814.0
+RUN: 7
+After run 7. Elapsed time 0.847369, energy used: 114712304053.0
+RUN: 8
+After run 8. Elapsed time 0.847148, energy used: 114993970141.0
+RUN: 9
+After run 9. Elapsed time 0.843082, energy used: 115273855960.0
+Total main elapsed time: 8.462468999999999
+[RESULT] Average power for vecadd --cpu-enabled=0: 342746105.4214793
+[COMMAND] ./run_scripts/run-app vecadd B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=48000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 115282049420.0
+RUN: 0
+After run 0. Elapsed time 0.849206, energy used: 115601930132.0
+RUN: 1
+After run 1. Elapsed time 0.846036, energy used: 115920108761.0
+RUN: 2
+After run 2. Elapsed time 0.844215, energy used: 116240344635.0
+RUN: 3
+After run 3. Elapsed time 0.844855, energy used: 116561153873.0
+RUN: 4
+After run 4. Elapsed time 0.844048, energy used: 116879036421.0
+RUN: 5
+After run 5. Elapsed time 0.846488, energy used: 117195918605.0
+RUN: 6
+After run 6. Elapsed time 0.845554, energy used: 117514256474.0
+RUN: 7
+After run 7. Elapsed time 0.849999, energy used: 117831102160.0
+RUN: 8
+After run 8. Elapsed time 0.846654, energy used: 118148445647.0
+RUN: 9
+After run 9. Elapsed time 0.846382, energy used: 118465638682.0
+Total main elapsed time: 8.463436999999999
+[RESULT] Average power for vecadd --cpu-enabled=1: 376670778.0775116
+[COMMAND] ./run_scripts/run-app vecmaxdiv B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=960000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 118474302539.0
+RUN: 0
+After run 0. Elapsed time 53.793092, energy used: 121753378068.0
+RUN: 1
+After run 1. Elapsed time 53.975892, energy used: 125105496074.0
+RUN: 2
+After run 2. Elapsed time 53.961, energy used: 128416243030.0
+RUN: 3
+After run 3. Elapsed time 53.979844, energy used: 131796480471.0
+RUN: 4
+After run 4. Elapsed time 53.785298, energy used: 135139000173.0
+RUN: 5
+After run 5. Elapsed time 53.977862, energy used: 138535070276.0
+RUN: 6
+After run 6. Elapsed time 53.957783, energy used: 141926723336.0
+RUN: 7
+After run 7. Elapsed time 53.945964, energy used: 145294849296.0
+RUN: 8
+After run 8. Elapsed time 53.949076, energy used: 148704058281.0
+RUN: 9
+After run 9. Elapsed time 53.798596, energy used: 152107592048.0
+Total main elapsed time: 539.124407
+[RESULT] Average power for vecmaxdiv --cpu-enabled=0: 62392711.18734567
+[COMMAND] ./run_scripts/run-app vecmaxdiv B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=960000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 152115705065.0
+RUN: 0
+After run 0. Elapsed time 53.899685, energy used: 160040351709.0
+RUN: 1
+After run 1. Elapsed time 54.134357, energy used: 167987605106.0
+RUN: 2
+After run 2. Elapsed time 53.689636, energy used: 175571586119.0
+RUN: 3
+After run 3. Elapsed time 53.755623, energy used: 183260462736.0
+RUN: 4
+After run 4. Elapsed time 53.952325, energy used: 190921010081.0
+RUN: 5
+After run 5. Elapsed time 53.96471, energy used: 198655343980.0
+RUN: 6
+After run 6. Elapsed time 53.754089, energy used: 206265199559.0
+RUN: 7
+After run 7. Elapsed time 53.732444, energy used: 214006280206.0
+RUN: 8
+After run 8. Elapsed time 53.838693, energy used: 221681878049.0
+RUN: 9
+After run 9. Elapsed time 53.761, energy used: 229476335878.0
+Total main elapsed time: 538.482562
+[RESULT] Average power for vecmaxdiv --cpu-enabled=1: 143673570.28917122
+[COMMAND] ./run_scripts/run-app patternsearch B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=960000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 229484724163.0
+RUN: 0
+After run 0. Elapsed time 56.802104, energy used: 232868678268.0
+RUN: 1
+After run 1. Elapsed time 56.733766, energy used: 236222262517.0
+RUN: 2
+After run 2. Elapsed time 56.738518, energy used: 239579295122.0
+RUN: 3
+After run 3. Elapsed time 56.738074, energy used: 242926697319.0
+RUN: 4
+After run 4. Elapsed time 56.731355, energy used: 246283625615.0
+RUN: 5
+After run 5. Elapsed time 56.73475, energy used: 249627123709.0
+RUN: 6
+After run 6. Elapsed time 56.740472, energy used: 252991784163.0
+RUN: 7
+After run 7. Elapsed time 56.735099, energy used: 256325783196.0
+RUN: 8
+After run 8. Elapsed time 56.738008, energy used: 259689593310.0
+RUN: 9
+After run 9. Elapsed time 56.741903, energy used: 897072044.0
+Total main elapsed time: 567.434049
+[RESULT] Average power for patternsearch --cpu-enabled=0: -402837123.5279891
+[COMMAND] ./run_scripts/run-app patternsearch B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=960000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+ENERGY BEFORE: 905834778.0
+RUN: 0
+After run 0. Elapsed time 56.749766, energy used: 10939097789.0
+RUN: 1
+After run 1. Elapsed time 56.740517, energy used: 20491849396.0
+RUN: 2
+After run 2. Elapsed time 56.750823, energy used: 29997843981.0
+RUN: 3
+After run 3. Elapsed time 56.741982, energy used: 39493670807.0
+RUN: 4
+After run 4. Elapsed time 56.853995, energy used: 48941762770.0
+RUN: 5
+After run 5. Elapsed time 56.81042, energy used: 58426239771.0
+RUN: 6
+After run 6. Elapsed time 56.741966, energy used: 67761476310.0
+RUN: 7
+After run 7. Elapsed time 56.967522, energy used: 77237629785.0
+RUN: 8
+After run 8. Elapsed time 56.740484, energy used: 86675611544.0
+RUN: 9
+After run 9. Elapsed time 56.907491, energy used: 96131105344.0
+Total main elapsed time: 568.004966
+[RESULT] Average power for patternsearch --cpu-enabled=1: 167656285.21987253
+[COMMAND] ./run_scripts/run-app rnn B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=100 --powercap=0 --problem-size=4000 --initial-cpu-batch-size-scaling=0
+ENERGY BEFORE: 96140590854.0
+RUN: 0
+After run 0. Elapsed time 2363.41823, energy used: 197383298652.0
+RUN: 1
+After run 1. Elapsed time 2363.388146, energy used: 36601621814.0
+RUN: 2
+After run 2. Elapsed time 2363.332658, energy used: 137052812473.0
+RUN: 3
+After run 3. Elapsed time 2363.246505, energy used: 237601943983.0
+RUN: 4
+After run 4. Elapsed time 2362.880498, energy used: 76201388053.0
+RUN: 5
+After run 5. Elapsed time 2362.958402, energy used: 177592074782.0
+RUN: 6
+After run 6. Elapsed time 2363.265332, energy used: 15648675271.0
+RUN: 7
+After run 7. Elapsed time 2363.364417, energy used: 116705620971.0
+RUN: 8
+After run 8. Elapsed time 2363.189115, energy used: 217646994580.0
+RUN: 9
+After run 9. Elapsed time 2363.280617, energy used: 56640795062.0
+Total main elapsed time: 23632.323920000003
+[RESULT] Average power for rnn --cpu-enabled=0: -1671207.2787126894
+[COMMAND] ./run_scripts/run-app rnn B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=100 --powercap=0 --problem-size=4000 --initial-cpu-batch-size-scaling=0
+ENERGY BEFORE: 73031599903.0
+RUN: 0
+After run 0. Elapsed time 2043.23814, energy used: 414116315225.0
+RUN: 1
+After run 1. Elapsed time 2036.905399, energy used: 752371918831.0
+RUN: 2
+After run 2. Elapsed time 2037.704893, energy used: 1089630223477.0
+RUN: 3
+After run 3. Elapsed time 2037.086893, energy used: 1427523198190.0
+RUN: 4
+After run 4. Elapsed time 2044.884131, energy used: 1767047882471.0
+RUN: 5
+After run 5. Elapsed time 2044.393034, energy used: 2105443922730.0
+RUN: 6
+After run 6. Elapsed time 2035.758136, energy used: 2439745404379.0
+RUN: 7
+After run 7. Elapsed time 2037.328063, energy used: 2776501787641.0
+RUN: 8
+After run 8. Elapsed time 2037.257031, energy used: 3112287664172.0
+RUN: 9
+After run 9. Elapsed time 2037.263561, energy used: 3448223649266.0
+Total main elapsed time: 20391.819281
+[RESULT] Average power for rnn --cpu-enabled=1: -1601938.223110717
