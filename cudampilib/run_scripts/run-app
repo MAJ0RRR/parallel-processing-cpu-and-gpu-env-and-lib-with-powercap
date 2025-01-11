@@ -64,7 +64,7 @@ elif [ "$MODE" == "C" ]; then
     echo "Running remotely with application '$APP_NAME'..."
 
     # Base MPI command for the master process
-    mpi_command="mpirun --display-map --mca orte_keep_fqdn_hostnames t \
+    mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile \"$TEMP_HOSTFILE\" \
@@ -94,7 +94,7 @@ elif [ "$MODE" == "B" ]; then
     head -n "$MACHINES_COUNT" "$HOSTFILE" > "$TEMP_HOSTFILE"
 
     # Base MPI command for the master process
-    mpi_command="mpirun --display-map --mca orte_keep_fqdn_hostnames t \
+    mpi_command="mpirun --mca orte_keep_fqdn_hostnames t \
 --mca btl_tcp_if_exclude docker0,docker_gwbridge,lo,vboxnet0 \
 --bind-to none \
 --machinefile \"$TEMP_HOSTFILE\" \

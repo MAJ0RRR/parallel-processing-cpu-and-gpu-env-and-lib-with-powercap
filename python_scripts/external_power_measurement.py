@@ -16,8 +16,6 @@ SSH_USER_NAME = ''
 SSH_PASSWORD = ''
 SSH_HOST = '172.20.83.215'
 
-
-
 def ssh_read_energy(username: str, password: str, host: str = SSH_HOST, port: int = 22):
     """Read energy from remote slave node"""
     try:
@@ -74,6 +72,13 @@ def run_script(command: str):
         sys.exit(1)
 
 if __name__ == "__main__":
+    """
+    Master runs on local node, slave runs on remote node.
+    Energy is measured on remote node. To do this there is a need to log in remote node using ssh and read energy_uj file.
+    
+    To run script fill SSH_USER_NAME, SSH_PASSWORD AND SSH_HOST (remote node ip).
+    """
+
     os.chdir(Path.home() / "parallel-processing-cpu-and-gpu-env-and-lib-with-powercap/cudampilib")
     commands = [
         f"./run_scripts/run-app collatz B {NUMBER_OF_NODES} --cpu-enabled=0 --number-of-streams={NUMBER_OF_STREAMS} --batch-size=480000 --powercap={POWERCAP} --problem-size={PROBLEM_SIZE} --initial-cpu-batch-size-scaling=100",
