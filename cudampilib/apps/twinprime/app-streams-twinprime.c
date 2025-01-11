@@ -170,7 +170,7 @@ int main(int argc, char **argv)
         __cudampi__kernelInStream(devPtr, stream);
         __cudampi__memcpyAsync(results + batch_pointer.start, devResults, batch_pointer.n_elements * sizeof(long long), cudaMemcpyDeviceToHost, stream);
 
-        if(streamcount = 2) 
+        if(streamcount == 2) 
         {
           batch_pointer = __cudampi__getnextchunkindex(&globalcounter, VECTORSIZE);
 
