@@ -6,10 +6,8 @@ from models import RunParameters, Experiment, ExperimentResult, MultipleRunResul
 from charts import time_powercap_scatter, time_batch_size_scatter, time_number_of_nodes_bar, time_number_of_nodes_scatter
 from experiments import run_experiment
 
-# For RNN: PROBLEM_SIZE = 4000
 # For RNN: NUMBER_OF_RUNS = 5
-PROBLEM_SIZE = 960_000_000
-NUMBER_OF_RUNS = 10
+NUMBER_OF_RUNS = 1
 
 def experiment_time_nodes(description: str, app_name: str, file_path: str | os.PathLike, batch_size: int = 50000):
     common_run_parameters = functools.partial(
@@ -17,7 +15,7 @@ def experiment_time_nodes(description: str, app_name: str, file_path: str | os.P
         app_name=app_name,
         batch_size=batch_size,
         powercap=None,
-        problem_size=PROBLEM_SIZE,
+        cpu_power_scaling=None,
         initial_cpu_batch_size_scaling=100
     )
     experiment = Experiment(
@@ -44,8 +42,8 @@ def experiment_time_powercap(description: str, app_name: str, file_path: str | o
         app_name=app_name,
         batch_size=50000,
         number_od_nodes=16,
-        number_of_streams=2,
-        problem_size=PROBLEM_SIZE,
+        cpu_power_scaling=None,
+        number_of_streams=2
     )
     experiment = Experiment(
         description=description,
@@ -70,8 +68,8 @@ def experiment_time_batch_size(description: str, app_name: str, file_path: str |
         app_name=app_name,
         number_od_nodes=number_of_nodes,
         number_of_streams=2,
-        problem_size=PROBLEM_SIZE,
         powercap=None,
+        cpu_power_scaling=None,
         # For RNN: initial_cpu_batch_size_scaling=0
         initial_cpu_batch_size_scaling=100
     )
@@ -117,10 +115,10 @@ if __name__ == "__main__":
     experiment_time_batch_size(description="time(batch_size)", app_name="rnn", file_path="rnn_batch_size_4_nodes.json", number_of_nodes=4)
     '''
 
-    experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="collatz", file_path="collatz_time_nodes.json", batch_size=480_000)
-    experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="vecadd", file_path="vecadd_time_nodes.json", batch_size=480_000)
-    experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="vecmaxdiv", file_path="vecmaxdiv_time_nodes.json", batch_size=960_000)
-    experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="patternsearch", file_path="patternsearch_time_nodes.json", batch_size=960_000)
+    # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="collatz", file_path="collatz_time_nodes.json", batch_size=480_000)
+    # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="vecadd", file_path="vecadd_time_nodes.json", batch_size=480_000)
+    # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="vecmaxdiv", file_path="vecmaxdiv_time_nodes.json", batch_size=960_000)
+    # experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="patternsearch", file_path="patternsearch_time_nodes.json", batch_size=960_000)
     '''
     experiment_time_nodes(description="time(number_of_nodes) and number of streams", app_name="rnn", file_path="rnn_time_nodes.json", batch_size=100)
     '''

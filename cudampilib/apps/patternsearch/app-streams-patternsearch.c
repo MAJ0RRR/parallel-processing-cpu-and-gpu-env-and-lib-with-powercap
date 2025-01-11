@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 
   streamcount = __cudampi__arguments.number_of_streams;
   batchsize = __cudampi__arguments.batch_size;
-  VECTORSIZE = __cudampi__arguments.problem_size;
+  VECTORSIZE = PATTERNSEARCH_VECTORSIZE;
 
   assert(batchsize % PATTERNSEARCH_THREADS_IN_BLOCK == 0);
 

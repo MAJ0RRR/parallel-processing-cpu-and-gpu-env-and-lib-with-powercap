@@ -85,3 +85,18 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
 
   return cudaSuccess;
 }
+
+void initializeCpuEnergyMeasurement(int* isInitialCpuEnergyMeasured, omp_lock_t* cpuEnergyLock, float* cpuLastEnergyMeasured) {
+  // Each thread executes this function before kernel launch to make sure that cpu energy was initialized
+  if (!isInitialCpuEnergyMeasured[omp_get_thread_num()]) {
+    // Initialize CPU energy value
+    omp_set_lock(&cpuEnergyLock[omp_get_thread_num()]);
+    if (!isInitialCpuEnergyMeasured[omp_get_thread_num()]) {
+      // This variable is unused since we just need to initialize cpuLastEnergyMeasured and don't care about actual value
+      float cpuEnergyMeasured;
+      isInitialCpuEnergyMeasured[omp_get_thread_num()] = 1;
+      getCpuEnergyUsed(&cpuLastEnergyMeasured[omp_get_thread_num()], &cpuEnergyMeasured);
+    }
+    omp_unset_lock(&cpuEnergyLock[omp_get_thread_num()]);
+  }
+}

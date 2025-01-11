@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 
   streamcount = __cudampi__arguments.number_of_streams;
   batchsize = __cudampi__arguments.batch_size;
-  VECTORSIZE = __cudampi__arguments.problem_size;
+  VECTORSIZE = RNN_VECTORSIZE;
 
   assert(RNN_HIDDEN_SIZE >= RNN_INPUT_SIZE && RNN_HIDDEN_SIZE >= RNN_OUTPUT_SIZE);
 

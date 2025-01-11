@@ -13,12 +13,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #include <stdlib.h>
 #include <sys/queue.h>
 #include <nvml.h>
+#include <assert.h>
 
 #include "cudampi.h"
 #include "cudampicommon.h"
 
-// + 1 stream for asynchronously processing GPU responses to master
-#define ALL_CPU_STREAMS CPU_STREAMS_SUPPORTED + 1
 // number of stream dedicated for sending GPU responses to master
 #define CPU_STREAM_FOR_GPU_RESPONSES CPU_STREAMS_SUPPORTED
 // 4 GB per GPU seems reasonable
@@ -36,8 +35,6 @@ int terminated[ALL_CPU_STREAMS] = {0};
 
 int debugTaskCounter = 0;
 
-float lastEnergyMeasured = 0.0;
-
 int *__cudampi_targetMPIrankfordevice; // MPI rank for device number (global)
 int *__cudampi__GPUcountspernode;
 int *__cudampi__freeThreadsPerNode;
@@ -49,6 +46,7 @@ int __cudampi__localGpuDeviceCount = 1;
 int __cudampi__localFreeThreadCount = 0;
 
 int __cudampi__cpu_enabled;
+float __cudampi__cpu_power_scaling;
 
 unsigned long cpuStreamsValid[CPU_STREAMS_SUPPORTED];
 
@@ -71,8 +69,12 @@ omp_lock_t task_available_locks[ALL_CPU_STREAMS];
 omp_lock_t synchronize_locks[ALL_CPU_STREAMS];
 
 int scheduledTasksInStream[ALL_CPU_STREAMS];
-omp_lock_t cpuEnergyLock;
-int isInitialCpuEnergyMeasured = 0;
+
+// Below deinitions are for CPU energy measurements 
+// (for measuring power consumption of CPU computation and managing the GPU)
+float cpuLastEnergyMeasured[MAX_THREADS] = {0.0};
+omp_lock_t cpuEnergyLock[MAX_THREADS];
+int isInitialCpuEnergyMeasured[MAX_THREADS] = {0};
 
 void launchkernel(void *devPtr, unsigned long batchSize);
 void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream);
@@ -468,6 +470,10 @@ int main(int argc, char **argv) {
   }
 
 
+  for (int i = 0; i < MAX_THREADS; i++) {
+    omp_init_lock(&cpuEnergyLock[i]);
+  }
+
   int mtsprovided;
 
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mtsprovided);
@@ -505,8 +511,11 @@ int main(int argc, char **argv) {
   }
 
   MPI_Bcast(&__cudampi__cpu_enabled, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&__cudampi__cpu_power_scaling, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
   if (__cudampi__cpu_enabled){
+      assert(__cudampi__cpu_power_scaling > 0.0 && __cudampi__cpu_power_scaling <= 1.0);
+  
       if (cudaSuccess != __cudampi__getCpuFreeThreads(&__cudampi__localFreeThreadCount)) {
       log_message(LOG_ERROR, "Error invoking __cudampi__getCpuFreeThreads()");
       exit(-1);
@@ -585,6 +594,8 @@ int main(int argc, char **argv) {
       log_message(LOG_ERROR, "nvmlInit failed: %s\n", nvmlErrorString(nvmlResult));
       return -1;
   }
+  
+  assert(numberOfThreads < MAX_THREADS);
 
   #pragma omp parallel num_threads(numberOfThreads)
   {
@@ -634,13 +645,16 @@ int main(int argc, char **argv) {
 
         if (status.MPI_TAG == __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ) {
           int measurepower;
+          cudaError_t error = cudaErrorUnknown;
 
           MPI_Recv(&measurepower, 1, MPI_INT, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZEREQ, __cudampi__communicators[omp_get_thread_num()], &status);
 
           // perform power measurement and attach it to the response
 
-          size_t ssize = sizeof(cudaError_t) + sizeof(float);
+          size_t ssize = sizeof(cudaError_t) + sizeof(float) + sizeof(float);
           unsigned char sdata[ssize];
+          float gpuPowerMeasured = -1.0;
+          float cpuEnergyMeasured = -1.0;
 
           int device;
           cudaGetDevice(&device);
@@ -653,8 +667,20 @@ int main(int argc, char **argv) {
           omp_unset_lock(&synchronize_locks[CPU_STREAM_FOR_GPU_RESPONSES]);
 
           *((cudaError_t *)sdata) = e;
+            
+          if (measurepower) {
+            error = getCpuEnergyUsed(&cpuLastEnergyMeasured[omp_get_thread_num()], &cpuEnergyMeasured);
+            if (error != cudaSuccess) {
+              cpuEnergyMeasured = -1.0;
+            }
+            else {
+              cpuEnergyMeasured *= (1 - __cudampi__cpu_power_scaling);
+            }
+            gpuPowerMeasured = getGPUpower(device);
+          }
 
-          *((float *)(sdata + sizeof(cudaError_t))) = (measurepower ? getGPUpower(device) : -1); // -1 if not measured
+          *((float *)(sdata + sizeof(cudaError_t))) = gpuPowerMeasured;
+          *((float *)(sdata + sizeof(cudaError_t) + sizeof(float))) = cpuEnergyMeasured;
 
           MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPIDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
           updateGlobalGpuMemcpyBuffer(&gpuMemcpyBuffer);
@@ -809,6 +835,8 @@ int main(int argc, char **argv) {
 
         if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHCUDAKERNELREQ) {
           // in this case in the message there is a serialized pointer
+          
+          initializeCpuEnergyMeasurement(isInitialCpuEnergyMeasured, cpuEnergyLock, cpuLastEnergyMeasured);
 
           int rsize = sizeof(void *) + sizeof(unsigned long);
           unsigned char rdata[rsize];
@@ -829,6 +857,8 @@ int main(int argc, char **argv) {
 
         if (status.MPI_TAG == __cudampi__CUDAMPILAUNCHKERNELINSTREAMREQ) {
           // in this case in the message there is a serialized pointer
+
+          initializeCpuEnergyMeasurement(isInitialCpuEnergyMeasured, cpuEnergyLock, cpuLastEnergyMeasured);
 
           int rsize = sizeof(void *) + sizeof(cudaStream_t) + sizeof(unsigned long);
           unsigned char rdata[rsize];
@@ -939,18 +969,23 @@ int main(int argc, char **argv) {
 
           size_t ssize = sizeof(cudaError_t) + sizeof(float);
           unsigned char sdata[ssize];
+          float energyMeasured;
 
           cpuSynchronize();
 
           if (measurepower) {
-            error = getCpuEnergyUsed(&lastEnergyMeasured, (float *)(sdata + sizeof(cudaError_t)));
+            error = getCpuEnergyUsed(&cpuLastEnergyMeasured[omp_get_thread_num()], &energyMeasured);
           }
 
           if (error != cudaSuccess) {
-            *((float *)(sdata + sizeof(cudaError_t))) = -1;
+            energyMeasured = -1.0;
+          }
+          else {
+            energyMeasured *= __cudampi__cpu_power_scaling;
           }
 
           *((cudaError_t *)sdata) = error;
+          *((float *)(sdata + sizeof(cudaError_t))) = energyMeasured;
 
           log_message(LOG_DEBUG, "Synchronized CPU device\n");
           MPI_Send(sdata, ssize, MPI_UNSIGNED_CHAR, 0, __cudampi__CUDAMPICPUDEVICESYNCHRONIZERESP, __cudampi__communicators[omp_get_thread_num()]);
@@ -1047,18 +1082,9 @@ int main(int argc, char **argv) {
         }
 
         if (status.MPI_TAG == __cudampi__CPULAUNCHKERNELREQ) {
+          initializeCpuEnergyMeasurement(isInitialCpuEnergyMeasured, cpuEnergyLock, cpuLastEnergyMeasured);
+
           int rsize = sizeof(void *) + sizeof(unsigned long) + sizeof(unsigned long);
-          if (!isInitialCpuEnergyMeasured) {
-            // Initialize CPU energy value
-            omp_set_lock(&cpuEnergyLock);
-            if (!isInitialCpuEnergyMeasured) {
-              // This variable is unused since we just need to initialize lastEnergyMeasured and don't care about actual value
-              float cpuEnergyMeasured;
-              isInitialCpuEnergyMeasured = 1;
-              getCpuEnergyUsed(&lastEnergyMeasured, &cpuEnergyMeasured);
-            }
-            omp_unset_lock(&cpuEnergyLock);
-          }
 
           unsigned char rdata[rsize];
 
@@ -1167,4 +1193,7 @@ int main(int argc, char **argv) {
     omp_destroy_lock(&task_available_locks[i]);
   }
   
+  for (int i = 0; i < MAX_THREADS; i++) {
+    omp_destroy_lock(&cpuEnergyLock[i]);
+  }
 }
