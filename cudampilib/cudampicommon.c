@@ -52,7 +52,7 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
 {
   int gpuCount = 0;
   cudaError_t status = cudaGetDeviceCount(&gpuCount);
-  *count = omp_get_max_threads() - gpuCount;
+  *count = omp_get_max_threads() - (gpuCount * 2);
   return status;
 }
 
@@ -80,6 +80,25 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   energy_joules = (float)energy_uj / 1e6;
 
   *energyUsed = energy_joules - *lastEnergyMeasured;
+
+  if (*energyUsed <= 0) {
+    // energy_uj counter overflow
+    unsigned long long maxCounter = 0;
+
+    file = fopen("/sys/class/powercap/intel-rapl:0/max_energy_range_uj", "r");
+    if (file == NULL) {
+        log_message(LOG_ERROR, "Failed to open max_energy_range_uj file");
+        return cudaErrorUnknown;
+    }
+
+    if (fscanf(file, "%llu", &maxCounter) != 1) {
+        log_message(LOG_ERROR, "Failed to read max_energy_range_uj value");
+        fclose(file);
+        return cudaErrorUnknown;
+    }
+  
+    *energyUsed = ((float)(energy_uj + maxCounter) / 1e6) - *lastEnergyMeasured;
+  }
 
   *lastEnergyMeasured = energy_joules;
 
