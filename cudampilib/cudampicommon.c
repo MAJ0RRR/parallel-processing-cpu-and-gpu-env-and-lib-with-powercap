@@ -21,12 +21,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 #define MPI_LOGGING
 #include "logger.h"
 
+/**
+ * @brief Compute device performance based on the period between two events.
+ * 
+ * @param period_us Time period between two events in microseconds.
+ * @return float Device performance.
+ */
 float computeDevPerformance(double period_us) {
   // period is just the time between two events so compute performance as an inverse
 
   return 1000000.0 / period_us;
 }
 
+/**
+ * @brief Get the power usage of a GPU.
+ * 
+ * @param gpuid ID of the GPU.
+ * @return float Power usage in watts.
+ */
 float getGPUpower(int gpuid) {
     nvmlReturn_t result;
     unsigned int power_mw;
@@ -48,6 +60,12 @@ float getGPUpower(int gpuid) {
     return (float)power_mw / 1000.0;
 }
 
+/**
+ * @brief Get the number of free CPU threads.
+ * 
+ * @param count Pointer to store the number of free CPU threads.
+ * @return cudaError_t CUDA error status.
+ */
 cudaError_t __cudampi__getCpuFreeThreads(int* count)
 {
   int gpuCount = 0;
@@ -56,7 +74,14 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   return status;
 }
 
- cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
+/**
+ * @brief Get the energy used by the CPU.
+ * 
+ * @param lastEnergyMeasured Pointer to the last energy measured.
+ * @param energyUsed Pointer to store the energy used.
+ * @return cudaError_t CUDA error status.
+ */
+cudaError_t getCpuEnergyUsed(float* lastEnergyMeasured, float* energyUsed) {
   // compute energy used from last energy measurement and update the variable
 
   FILE *file;
@@ -105,6 +130,13 @@ cudaError_t __cudampi__getCpuFreeThreads(int* count)
   return cudaSuccess;
 }
 
+/**
+ * @brief Initialize CPU energy measurement.
+ * 
+ * @param isInitialCpuEnergyMeasured Array to check if initial CPU energy is measured.
+ * @param cpuEnergyLock Array of locks for CPU energy measurement.
+ * @param cpuLastEnergyMeasured Array to store the last CPU energy measured.
+ */
 void initializeCpuEnergyMeasurement(int* isInitialCpuEnergyMeasured, omp_lock_t* cpuEnergyLock, float* cpuLastEnergyMeasured) {
   // Each thread executes this function before kernel launch to make sure that cpu energy was initialized
   if (!isInitialCpuEnergyMeasured[omp_get_thread_num()]) {

@@ -1,0 +1,110 @@
+
+\doxysubsection*{cudampilib.\+c}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{cudampilib_8c_a4571ca67e88aa11e15ffce5c088d4cc6}{TAILQ\+\_\+\+HEAD}} (memcpy\+\_\+queue\+\_\+head, memcpy\+\_\+queue\+\_\+entry)
+\item 
+unsigned long \mbox{\hyperlink{cudampilib_8c_a8f7307a39c57568c45c08b447ab52a59}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+get\+Current\+Batch\+Size}} ()
+\begin{DoxyCompactList}\small\item\em Gets the current batch size. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a4db8696bbfa4165105db349493bdbea8}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+record\+Batch\+Size\+For\+Device\+Stats}} (unsigned long batchsize)
+\begin{DoxyCompactList}\small\item\em Records the batch size for device statistics. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_ab51275dfc372d0ce307468b1320f6c92}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+finish\+Device\+Stats\+Measurement}} (double elapsed\+Time\+Seconds)
+\begin{DoxyCompactList}\small\item\em Finishes device statistics measurement. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_afdc2ffeab4a06313d94229706f66cb98}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+ready\+For\+Cpu\+Batch\+Size\+Scaling}} ()
+\begin{DoxyCompactList}\small\item\em Checks if the system is ready for CPU batch size scaling. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_af735ce992aa6eb76b0d20bbc96a62a38}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+scale\+Cpu\+Batch\+Size}} ()
+\begin{DoxyCompactList}\small\item\em Scales the CPU batch size. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_a02c4464d98717b6231bf3cad29650b5e}{get\+Msg\+Counter}} ()
+\begin{DoxyCompactList}\small\item\em Gets a unique message counter for asynchronous messages. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a20c4794975d99bcd01e7f0a022e14200}{initiate\+Async\+Recv}} (void $\ast$dst, unsigned long count, int counter)
+\begin{DoxyCompactList}\small\item\em Initiates an asynchronous receive operation. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a9e8d36bdc39cd7233e2436b7993ae9bf}{initiate\+Async\+Send\+Cpu}} (const void $\ast$src, unsigned long count, int counter)
+\begin{DoxyCompactList}\small\item\em Initiates an asynchronous send operation for the CPU. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a5a92c358c3fc45be341f3245aea8c13a}{wait\+For\+Async\+Send\+Response}} (int counter)
+\begin{DoxyCompactList}\small\item\em Waits for an asynchronous send response. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a9baecb1d2694f2ab3854b9a4df22920c}{process\+\_\+queue}} ()
+\begin{DoxyCompactList}\small\item\em Processes the memcpy queue. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_aa5343eb6488af19a07371fffef436064}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+setglobalpowerlimit}} (float powerlimit)
+\begin{DoxyCompactList}\small\item\em Sets the global power limit. \end{DoxyCompactList}\item 
+float \mbox{\hyperlink{cudampilib_8c_a1f52101d4fddc14234bd3a6ae2b54c69}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+gettotalpowerofselecteddevices}} ()
+\begin{DoxyCompactList}\small\item\em Gets the total power of selected devices. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_affb2fb230959d60e4d56ff24ec707850}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+selectdevicesforpowerlimit\+\_\+greedy}} ()
+\begin{DoxyCompactList}\small\item\em Selects devices for the power limit using a greedy strategy. \end{DoxyCompactList}\item 
+\+\_\+\+\_\+cudampi\+\_\+\+\_\+batch\+\_\+pointer \mbox{\hyperlink{cudampilib_8c_aef7db7cf0b0c5d6605133e208a4ba9e2}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+getnextchunkindex\+\_\+enableddevices}} (long long $\ast$globalcounter, unsigned long batchsize, long long max)
+\begin{DoxyCompactList}\small\item\em Gets the next chunk index for enabled devices. \end{DoxyCompactList}\item 
+\+\_\+\+\_\+cudampi\+\_\+\+\_\+batch\+\_\+pointer \mbox{\hyperlink{cudampilib_8c_ae1d5b01b75085729b7de33c8036f26df}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+getnextchunkindex\+\_\+alldevices}} (long long $\ast$globalcounter, unsigned long batchsize, long long max)
+\begin{DoxyCompactList}\small\item\em Gets the next chunk index for all devices. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_a96de25eaf7df560b78726670630588a8}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+isdeviceenabled}} (int deviceid)
+\begin{DoxyCompactList}\small\item\em Checks if a device is enabled. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_ab7792ac3c7c2e4d837a5c72aa8f267dd}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+get\+Device\+Count}} (int $\ast$count)
+\begin{DoxyCompactList}\small\item\em Gets the total device count. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_aedd479eedfeb56b6e7661ed7e8beb4e0}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Get\+Device\+Count}} (int $\ast$count)
+\begin{DoxyCompactList}\small\item\em Gets the GPU device count. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a44c35d641212a989cba35c7bd38de37b}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Get\+Device\+Count}} (int $\ast$count)
+\begin{DoxyCompactList}\small\item\em Gets the CPU device count. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a6ae87449e9fbf4ec7e10f1d980cb4595}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+initialize\+MPI}} (int argc, char $\ast$$\ast$argv)
+\begin{DoxyCompactList}\small\item\em Initializes MPI. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a8c7b811a879ad4b90684c69ec1dda742}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+terminate\+MPI}} ()
+\begin{DoxyCompactList}\small\item\em Terminates MPI. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_a9c470d1455a5bcdba8467adb621f132b}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+gettarget\+GPU}} (int device)
+\begin{DoxyCompactList}\small\item\em Gets the target GPU ID for a device. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_a5868168018c567d0bbeda20006ae7888}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+gettarget\+MPIrank}} (int device)
+\begin{DoxyCompactList}\small\item\em Gets the target MPI rank for a device. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a46732c7acfbc19cc995b5f2f8a683349}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Malloc}} (void $\ast$$\ast$dev\+Ptr, size\+\_\+t size)
+\begin{DoxyCompactList}\small\item\em Allocates memory on the GPU. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_ad4a1b62c84136ba6c2bd687050ca1b11}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Malloc}} (void $\ast$$\ast$dev\+Ptr, size\+\_\+t size)
+\begin{DoxyCompactList}\small\item\em Allocates memory on the CPU. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a13467fa7c9c19a9bb76d90330c82bd19}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+malloc}} (void $\ast$$\ast$dev\+Ptr, size\+\_\+t size)
+\begin{DoxyCompactList}\small\item\em Allocates memory on the appropriate device (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a8ef010c5c87f87593fff279ac0e2557e}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Free}} (void $\ast$dev\+Ptr)
+\begin{DoxyCompactList}\small\item\em Frees memory on the GPU. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_aa97945397426afc13df2f6903127ff78}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Free}} (void $\ast$dev\+Ptr)
+\begin{DoxyCompactList}\small\item\em Frees memory on the CPU. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_ae732a95e6b24cb8fe5481dfd518c8d83}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+free}} (void $\ast$dev\+Ptr)
+\begin{DoxyCompactList}\small\item\em Frees memory on the appropriate device (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_acd06f472a48c41a3430861b46f08eb63}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Device\+Synchronize}} (void)
+\begin{DoxyCompactList}\small\item\em Synchronizes the device (GPU or CPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a240ec57a9883494594d0d852df8feb91}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+device\+Synchronize}} (void)
+\begin{DoxyCompactList}\small\item\em Synchronizes the device (GPU or CPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a32df6e4f6faf09e35f84a08ec4b4a55f}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Set\+Device}} (int device)
+\begin{DoxyCompactList}\small\item\em Sets the device (GPU or CPU). \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampilib_8c_ae04b255d98c6e243c697f4f8925b628a}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+is\+Cpu}} ()
+\begin{DoxyCompactList}\small\item\em Checks if the current device is a CPU. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a4dfe6804ef879acadafbe9c476e31875}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+set\+Device}} (int device)
+\begin{DoxyCompactList}\small\item\em Sets the device (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a119a386a9f4f765545dde4e513ced3d3}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Memcpy}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind)
+\begin{DoxyCompactList}\small\item\em Copies memory between host and device (GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a722a21625b4f8349d6da66d8ccc3f19c}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Memcpy}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind)
+\begin{DoxyCompactList}\small\item\em Copies memory between host and device (CPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a66575a8292d87304d243beb0936cb708}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Memcpy\+Async}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Asynchronously copies memory between host and device (GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a8d6a6ba5c0a8f8ce668caf39519e8a23}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Memcpy\+Async}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Asynchronously copies memory between host and device (CPU). \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a8e04c459772a1746f9e9b015c0640fef}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Kernel\+In\+Stream}} (void $\ast$dev\+Ptr, unsigned long batchsize, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Launches a CUDA kernel in a specific stream. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a405bb85a27f1838c85dcbd74f9eb108c}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Kernel}} (void $\ast$dev\+Ptr, unsigned long batchsize)
+\begin{DoxyCompactList}\small\item\em Launches a CUDA kernel. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a1fbf5b6e685c894c72950d98ff7ff011}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Kernel\+In\+Stream}} (void $\ast$dev\+Ptr, unsigned long batchsize, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Launches a CPU kernel in a specific stream. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a501538a58521f67a2fee835297b4052a}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Kernel}} (void $\ast$dev\+Ptr, unsigned long batchsize)
+\begin{DoxyCompactList}\small\item\em Launches a CPU kernel. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_aeb882e26b9d6d1ffb91beadf1f59626e}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Stream\+Create}} (cuda\+Stream\+\_\+t $\ast$p\+Stream)
+\begin{DoxyCompactList}\small\item\em Creates a CUDA stream. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a326299cbc12a6186a2851f9741b907be}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cuda\+Stream\+Destroy}} (cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Destroys a CUDA stream. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_afabd6a8668da9e5d7111c31b4527ee61}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Stream\+Create}} (cuda\+Stream\+\_\+t $\ast$p\+Stream)
+\begin{DoxyCompactList}\small\item\em Creates a CPU stream. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_aa4d6cc32d3e644fd70483e2473b06bde}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+cpu\+Stream\+Destroy}} (cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Destroys a CPU stream. \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a04f151dede80e5dcb2b6ac428bf79a78}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+stream\+Create}} (cuda\+Stream\+\_\+t $\ast$stream)
+\begin{DoxyCompactList}\small\item\em Creates a stream (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a323c336eb705d5b2d7e1554cc4ca9625}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+stream\+Destroy}} (cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Destroys a stream (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_ae840c607d07ffbf27f4b0a1e9293e1ba}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+memcpy\+Async}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Asynchronously copies memory between host and device (CPU or GPU). \end{DoxyCompactList}\item 
+cuda\+Error\+\_\+t \mbox{\hyperlink{cudampilib_8c_a25c0161223e2401e434b638db9d4f9ce}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+memcpy}} (void $\ast$dst, const void $\ast$src, size\+\_\+t count, enum cuda\+Memcpy\+Kind kind)
+\begin{DoxyCompactList}\small\item\em Copies memory between host and device (CPU or GPU). \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_a257cd3752e956d9c53650c3e78e7f219}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+kernel\+In\+Stream}} (void $\ast$dev\+Ptr, cuda\+Stream\+\_\+t stream)
+\begin{DoxyCompactList}\small\item\em Launches a kernel in a specific stream (CPU or GPU). \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampilib_8c_ad29d93e171b46c69d28a12adf43835ad}{\+\_\+\+\_\+cudampi\+\_\+\+\_\+kernel}} (void $\ast$dev\+Ptr)
+\begin{DoxyCompactList}\small\item\em Launches a kernel (CPU or GPU). \end{DoxyCompactList}\end{DoxyCompactItemize}

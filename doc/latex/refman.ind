@@ -1,0 +1,541 @@
+\begin{theindex}
+
+  \item {\_\_cudampi\_\_CPUcountspernode}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_GPUcountspernode}
+    \subitem {cudampilib.c}, \hyperpage{31}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_\_MPIinitialized}
+    \subitem {cudampilib.c}, \hyperpage{32}
+  \item {\_\_cudampi\_\_MPIproccount}
+    \subitem {cudampilib.c}, \hyperpage{32}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_\_amimanager}
+    \subitem {cudampilib.c}, \hyperpage{28}
+  \item {\_\_cudampi\_\_arguments}
+    \subitem {cudampilib.c}, \hyperpage{28}
+  \item {\_\_cudampi\_\_batches\_sent}
+    \subitem {cudampilib.c}, \hyperpage{28}
+  \item {\_\_cudampi\_\_communicators}
+    \subitem {cudampilib.c}, \hyperpage{28}
+    \subitem {cudampislave.c}, \hyperpage{43}
+  \item {\_\_cudampi\_\_cpuBatchSizeScalingDone}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_cpuFree}
+    \subitem {cudampilib.c}, \hyperpage{11}
+  \item {\_\_cudampi\_\_cpuGetDeviceCount}
+    \subitem {cudampilib.c}, \hyperpage{11}
+  \item {\_\_cudampi\_\_cpuKernel}
+    \subitem {cudampilib.c}, \hyperpage{11}
+  \item {\_\_cudampi\_\_cpuKernelInStream}
+    \subitem {cudampilib.c}, \hyperpage{12}
+  \item {\_\_cudampi\_\_cpuMalloc}
+    \subitem {cudampilib.c}, \hyperpage{12}
+  \item {\_\_cudampi\_\_cpuMemcpy}
+    \subitem {cudampilib.c}, \hyperpage{12}
+  \item {\_\_cudampi\_\_cpuMemcpyAsync}
+    \subitem {cudampilib.c}, \hyperpage{13}
+  \item {\_\_cudampi\_\_cpuStreamCreate}
+    \subitem {cudampilib.c}, \hyperpage{13}
+  \item {\_\_cudampi\_\_cpuStreamDestroy}
+    \subitem {cudampilib.c}, \hyperpage{14}
+  \item {\_\_cudampi\_\_cpu\_batch\_size}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_cpu\_enabled}
+    \subitem {cudampilib.c}, \hyperpage{29}
+    \subitem {cudampislave.c}, \hyperpage{43}
+  \item {\_\_cudampi\_\_cpu\_power\_scaling}
+    \subitem {cudampilib.c}, \hyperpage{29}
+    \subitem {cudampislave.c}, \hyperpage{43}
+  \item {\_\_cudampi\_\_cudaDeviceSynchronize}
+    \subitem {cudampilib.c}, \hyperpage{14}
+  \item {\_\_cudampi\_\_cudaFree}
+    \subitem {cudampilib.c}, \hyperpage{14}
+  \item {\_\_cudampi\_\_cudaGetDeviceCount}
+    \subitem {cudampilib.c}, \hyperpage{15}
+  \item {\_\_cudampi\_\_cudaKernel}
+    \subitem {cudampilib.c}, \hyperpage{15}
+  \item {\_\_cudampi\_\_cudaKernelInStream}
+    \subitem {cudampilib.c}, \hyperpage{15}
+  \item {\_\_cudampi\_\_cudaMalloc}
+    \subitem {cudampilib.c}, \hyperpage{16}
+  \item {\_\_cudampi\_\_cudaMemcpy}
+    \subitem {cudampilib.c}, \hyperpage{16}
+  \item {\_\_cudampi\_\_cudaMemcpyAsync}
+    \subitem {cudampilib.c}, \hyperpage{17}
+  \item {\_\_cudampi\_\_cudaSetDevice}
+    \subitem {cudampilib.c}, \hyperpage{17}
+  \item {\_\_cudampi\_\_cudaStreamCreate}
+    \subitem {cudampilib.c}, \hyperpage{17}
+  \item {\_\_cudampi\_\_cudaStreamDestroy}
+    \subitem {cudampilib.c}, \hyperpage{18}
+  \item {\_\_cudampi\_\_currentCommunicator}
+    \subitem {cudampilib.c}, \hyperpage{10}
+  \item {\_\_cudampi\_\_currentDevice}
+    \subitem {cudampilib.c}, \hyperpage{10}
+  \item {\_\_cudampi\_\_currentMemcpyQueue}
+    \subitem {cudampilib.c}, \hyperpage{10}
+  \item {\_\_cudampi\_\_currentdevice}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_data\_points\_sent}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_default\_batch\_size}
+    \subitem {cudampilib.c}, \hyperpage{29}
+  \item {\_\_cudampi\_\_deviceSynchronize}
+    \subitem {cudampilib.c}, \hyperpage{18}
+  \item {\_\_cudampi\_\_deviceenabled}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_devicelocks}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_devicepower}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_dyanmicCpuBatchSizeScalingEnabled}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_finishDeviceStatsMeasurement}
+    \subitem {cudampilib.c}, \hyperpage{18}
+  \item {\_\_cudampi\_\_firstIterDeviceMeasurementStarted}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_firstIterMeasuredForDevice}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_firstIterNumberCpuDevicesMeasured}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_firstIterNumberGpuDevicesMeasured}
+    \subitem {cudampilib.c}, \hyperpage{30}
+  \item {\_\_cudampi\_\_firstIterTotalCpuBatchTimeSeconds}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_firstIterTotalCpuBatches}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_firstIterTotalGpuBatchTimeSeconds}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_firstIterTotalGpuBatches}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_free}
+    \subitem {cudampilib.c}, \hyperpage{19}
+  \item {\_\_cudampi\_\_freeThreadsPerNode}
+    \subitem {cudampilib.c}, \hyperpage{31}
+    \subitem {cudampislave.c}, \hyperpage{43}
+  \item {\_\_cudampi\_\_getCpuFreeThreads}
+    \subitem {cudampicommon.c}, \hyperpage{4}
+  \item {\_\_cudampi\_\_getCurrentBatchSize}
+    \subitem {cudampilib.c}, \hyperpage{19}
+  \item {\_\_cudampi\_\_getDeviceCount}
+    \subitem {cudampilib.c}, \hyperpage{19}
+  \item {\_\_cudampi\_\_getnextchunkindex\_alldevices}
+    \subitem {cudampilib.c}, \hyperpage{20}
+  \item {\_\_cudampi\_\_getnextchunkindex\_enableddevices}
+    \subitem {cudampilib.c}, \hyperpage{20}
+  \item {\_\_cudampi\_\_gettargetGPU}
+    \subitem {cudampilib.c}, \hyperpage{20}
+  \item {\_\_cudampi\_\_gettargetMPIrank}
+    \subitem {cudampilib.c}, \hyperpage{21}
+  \item {\_\_cudampi\_\_gettotalpowerofselecteddevices}
+    \subitem {cudampilib.c}, \hyperpage{21}
+  \item {\_\_cudampi\_\_globalpowerlimit}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_initializeMPI}
+    \subitem {cudampilib.c}, \hyperpage{21}
+  \item {\_\_cudampi\_\_isCpu}
+    \subitem {cudampilib.c}, \hyperpage{22}
+  \item {\_\_cudampi\_\_isdeviceenabled}
+    \subitem {cudampilib.c}, \hyperpage{22}
+  \item {\_\_cudampi\_\_isglobalpowerlimitset}
+    \subitem {cudampilib.c}, \hyperpage{31}
+  \item {\_\_cudampi\_\_kernel}
+    \subitem {cudampilib.c}, \hyperpage{22}
+  \item {\_\_cudampi\_\_kernelInStream}
+    \subitem {cudampilib.c}, \hyperpage{23}
+  \item {\_\_cudampi\_\_last\_batches\_sent}
+    \subitem {cudampilib.c}, \hyperpage{32}
+  \item {\_\_cudampi\_\_last\_data\_points\_sent}
+    \subitem {cudampilib.c}, \hyperpage{32}
+  \item {\_\_cudampi\_\_localFreeThreadCount}
+    \subitem {cudampilib.c}, \hyperpage{32}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_\_localGpuDeviceCount}
+    \subitem {cudampilib.c}, \hyperpage{32}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_\_malloc}
+    \subitem {cudampilib.c}, \hyperpage{23}
+  \item {\_\_cudampi\_\_memcpy}
+    \subitem {cudampilib.c}, \hyperpage{23}
+  \item {\_\_cudampi\_\_memcpyAsync}
+    \subitem {cudampilib.c}, \hyperpage{24}
+  \item {\_\_cudampi\_\_memcpy\_queues}
+    \subitem {cudampilib.c}, \hyperpage{32}
+  \item {\_\_cudampi\_\_myrank}
+    \subitem {cudampilib.c}, \hyperpage{32}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_\_readyForCpuBatchSizeScaling}
+    \subitem {cudampilib.c}, \hyperpage{24}
+  \item {\_\_cudampi\_\_recordBatchSizeForDeviceStats}
+    \subitem {cudampilib.c}, \hyperpage{24}
+  \item {\_\_cudampi\_\_scaleCpuBatchSize}
+    \subitem {cudampilib.c}, \hyperpage{25}
+  \item {\_\_cudampi\_\_selectdevicesforpowerlimit\_greedy}
+    \subitem {cudampilib.c}, \hyperpage{25}
+  \item {\_\_cudampi\_\_setDevice}
+    \subitem {cudampilib.c}, \hyperpage{25}
+  \item {\_\_cudampi\_\_setglobalpowerlimit}
+    \subitem {cudampilib.c}, \hyperpage{25}
+  \item {\_\_cudampi\_\_streamCreate}
+    \subitem {cudampilib.c}, \hyperpage{26}
+  \item {\_\_cudampi\_\_streamDestroy}
+    \subitem {cudampilib.c}, \hyperpage{26}
+  \item {\_\_cudampi\_\_terminateMPI}
+    \subitem {cudampilib.c}, \hyperpage{26}
+  \item {\_\_cudampi\_\_time\_us}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_\_timemeasured}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_\_timestart}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_\_timestop}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_\_totalEnergyUsed}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_\_totaldevicecount}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_isLocalGpu}
+    \subitem {cudampilib.c}, \hyperpage{10}
+  \item {\_\_cudampi\_targetGPUfordevice}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_targetMPIrankfordevice}
+    \subitem {cudampilib.c}, \hyperpage{33}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {\_\_cudampi\_totalcpudevicecount}
+    \subitem {cudampilib.c}, \hyperpage{33}
+  \item {\_\_cudampi\_totaldevicecount}
+    \subitem {cudampilib.c}, \hyperpage{34}
+  \item {\_\_cudampi\_totalgpudevicecount}
+    \subitem {cudampilib.c}, \hyperpage{34}
+
+  \indexspace
+
+  \item {allocateCpuTaskInStream}
+    \subitem {cudampislave.c}, \hyperpage{38}
+  \item {ALLOCATED\_IN\_GLOBAL\_BUFFER}
+    \subitem {cudampislave.c}, \hyperpage{38}
+  \item {ALLOCATED\_SEPARATELY}
+    \subitem {cudampislave.c}, \hyperpage{38}
+  \item {allocateGpuMemcpyBuffer}
+    \subitem {cudampislave.c}, \hyperpage{38}
+  \item {asyncMsgCounter}
+    \subitem {cudampilib.c}, \hyperpage{34}
+
+  \indexspace
+
+  \item {bufferAllocationType}
+    \subitem {cudampislave.c}, \hyperpage{37}
+
+  \indexspace
+
+  \item {computeDevPerformance}
+    \subitem {cudampicommon.c}, \hyperpage{4}
+  \item {CPU\_STREAM\_FOR\_GPU\_RESPONSES}
+    \subitem {cudampislave.c}, \hyperpage{37}
+  \item {cpuDeviceToHostTaskAsync}
+    \subitem {cudampislave.c}, \hyperpage{38}
+  \item {cpuEnergyLock}
+    \subitem {cudampilib.c}, \hyperpage{34}
+    \subitem {cudampislave.c}, \hyperpage{44}
+  \item {cpuHostToDeviceTaskAsync}
+    \subitem {cudampislave.c}, \hyperpage{39}
+  \item {cpuLastEnergyMeasured}
+    \subitem {cudampilib.c}, \hyperpage{34}
+  \item {cpuLaunchKernelTask}
+    \subitem {cudampislave.c}, \hyperpage{39}
+  \item {cpuStreamsValid}
+    \subitem {cudampislave.c}, \hyperpage{45}
+  \item {cpuSynchronize}
+    \subitem {cudampislave.c}, \hyperpage{39}
+  \item {cpuTaskLauncher}
+    \subitem {cudampislave.c}, \hyperpage{39}
+  \item {cudampicommon.c}, \hyperpage{3}
+    \subitem {\_\_cudampi\_\_getCpuFreeThreads}, \hyperpage{4}
+    \subitem {computeDevPerformance}, \hyperpage{4}
+    \subitem {ENABLE\_LOGGING}, \hyperpage{4}
+    \subitem {getCpuEnergyUsed}, \hyperpage{5}
+    \subitem {getGPUpower}, \hyperpage{5}
+    \subitem {initializeCpuEnergyMeasurement}, \hyperpage{5}
+    \subitem {MPI\_LOGGING}, \hyperpage{4}
+  \item {cudampilib.c}, \hyperpage{6}
+    \subitem {\_\_cudampi\_\_CPUcountspernode}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_GPUcountspernode}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_MPIinitialized}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_MPIproccount}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_amimanager}, \hyperpage{28}
+    \subitem {\_\_cudampi\_\_arguments}, \hyperpage{28}
+    \subitem {\_\_cudampi\_\_batches\_sent}, \hyperpage{28}
+    \subitem {\_\_cudampi\_\_communicators}, \hyperpage{28}
+    \subitem {\_\_cudampi\_\_cpuBatchSizeScalingDone}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_cpuFree}, \hyperpage{11}
+    \subitem {\_\_cudampi\_\_cpuGetDeviceCount}, \hyperpage{11}
+    \subitem {\_\_cudampi\_\_cpuKernel}, \hyperpage{11}
+    \subitem {\_\_cudampi\_\_cpuKernelInStream}, \hyperpage{12}
+    \subitem {\_\_cudampi\_\_cpuMalloc}, \hyperpage{12}
+    \subitem {\_\_cudampi\_\_cpuMemcpy}, \hyperpage{12}
+    \subitem {\_\_cudampi\_\_cpuMemcpyAsync}, \hyperpage{13}
+    \subitem {\_\_cudampi\_\_cpuStreamCreate}, \hyperpage{13}
+    \subitem {\_\_cudampi\_\_cpuStreamDestroy}, \hyperpage{14}
+    \subitem {\_\_cudampi\_\_cpu\_batch\_size}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_cpu\_enabled}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_cpu\_power\_scaling}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_cudaDeviceSynchronize}, \hyperpage{14}
+    \subitem {\_\_cudampi\_\_cudaFree}, \hyperpage{14}
+    \subitem {\_\_cudampi\_\_cudaGetDeviceCount}, \hyperpage{15}
+    \subitem {\_\_cudampi\_\_cudaKernel}, \hyperpage{15}
+    \subitem {\_\_cudampi\_\_cudaKernelInStream}, \hyperpage{15}
+    \subitem {\_\_cudampi\_\_cudaMalloc}, \hyperpage{16}
+    \subitem {\_\_cudampi\_\_cudaMemcpy}, \hyperpage{16}
+    \subitem {\_\_cudampi\_\_cudaMemcpyAsync}, \hyperpage{17}
+    \subitem {\_\_cudampi\_\_cudaSetDevice}, \hyperpage{17}
+    \subitem {\_\_cudampi\_\_cudaStreamCreate}, \hyperpage{17}
+    \subitem {\_\_cudampi\_\_cudaStreamDestroy}, \hyperpage{18}
+    \subitem {\_\_cudampi\_\_currentCommunicator}, \hyperpage{10}
+    \subitem {\_\_cudampi\_\_currentDevice}, \hyperpage{10}
+    \subitem {\_\_cudampi\_\_currentMemcpyQueue}, \hyperpage{10}
+    \subitem {\_\_cudampi\_\_currentdevice}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_data\_points\_sent}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_default\_batch\_size}, \hyperpage{29}
+    \subitem {\_\_cudampi\_\_deviceSynchronize}, \hyperpage{18}
+    \subitem {\_\_cudampi\_\_deviceenabled}, \hyperpage{30}
+    \subitem {\_\_cudampi\_\_devicelocks}, \hyperpage{30}
+    \subitem {\_\_cudampi\_\_devicepower}, \hyperpage{30}
+    \subitem {\_\_cudampi\_\_dyanmicCpuBatchSizeScalingEnabled}, 
+		\hyperpage{30}
+    \subitem {\_\_cudampi\_\_finishDeviceStatsMeasurement}, 
+		\hyperpage{18}
+    \subitem {\_\_cudampi\_\_firstIterDeviceMeasurementStarted}, 
+		\hyperpage{30}
+    \subitem {\_\_cudampi\_\_firstIterMeasuredForDevice}, 
+		\hyperpage{30}
+    \subitem {\_\_cudampi\_\_firstIterNumberCpuDevicesMeasured}, 
+		\hyperpage{30}
+    \subitem {\_\_cudampi\_\_firstIterNumberGpuDevicesMeasured}, 
+		\hyperpage{30}
+    \subitem {\_\_cudampi\_\_firstIterTotalCpuBatchTimeSeconds}, 
+		\hyperpage{31}
+    \subitem {\_\_cudampi\_\_firstIterTotalCpuBatches}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_firstIterTotalGpuBatchTimeSeconds}, 
+		\hyperpage{31}
+    \subitem {\_\_cudampi\_\_firstIterTotalGpuBatches}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_free}, \hyperpage{19}
+    \subitem {\_\_cudampi\_\_freeThreadsPerNode}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_getCurrentBatchSize}, \hyperpage{19}
+    \subitem {\_\_cudampi\_\_getDeviceCount}, \hyperpage{19}
+    \subitem {\_\_cudampi\_\_getnextchunkindex\_alldevices}, 
+		\hyperpage{20}
+    \subitem {\_\_cudampi\_\_getnextchunkindex\_enableddevices}, 
+		\hyperpage{20}
+    \subitem {\_\_cudampi\_\_gettargetGPU}, \hyperpage{20}
+    \subitem {\_\_cudampi\_\_gettargetMPIrank}, \hyperpage{21}
+    \subitem {\_\_cudampi\_\_gettotalpowerofselecteddevices}, 
+		\hyperpage{21}
+    \subitem {\_\_cudampi\_\_globalpowerlimit}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_initializeMPI}, \hyperpage{21}
+    \subitem {\_\_cudampi\_\_isCpu}, \hyperpage{22}
+    \subitem {\_\_cudampi\_\_isdeviceenabled}, \hyperpage{22}
+    \subitem {\_\_cudampi\_\_isglobalpowerlimitset}, \hyperpage{31}
+    \subitem {\_\_cudampi\_\_kernel}, \hyperpage{22}
+    \subitem {\_\_cudampi\_\_kernelInStream}, \hyperpage{23}
+    \subitem {\_\_cudampi\_\_last\_batches\_sent}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_last\_data\_points\_sent}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_localFreeThreadCount}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_localGpuDeviceCount}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_malloc}, \hyperpage{23}
+    \subitem {\_\_cudampi\_\_memcpy}, \hyperpage{23}
+    \subitem {\_\_cudampi\_\_memcpyAsync}, \hyperpage{24}
+    \subitem {\_\_cudampi\_\_memcpy\_queues}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_myrank}, \hyperpage{32}
+    \subitem {\_\_cudampi\_\_readyForCpuBatchSizeScaling}, 
+		\hyperpage{24}
+    \subitem {\_\_cudampi\_\_recordBatchSizeForDeviceStats}, 
+		\hyperpage{24}
+    \subitem {\_\_cudampi\_\_scaleCpuBatchSize}, \hyperpage{25}
+    \subitem {\_\_cudampi\_\_selectdevicesforpowerlimit\_greedy}, 
+		\hyperpage{25}
+    \subitem {\_\_cudampi\_\_setDevice}, \hyperpage{25}
+    \subitem {\_\_cudampi\_\_setglobalpowerlimit}, \hyperpage{25}
+    \subitem {\_\_cudampi\_\_streamCreate}, \hyperpage{26}
+    \subitem {\_\_cudampi\_\_streamDestroy}, \hyperpage{26}
+    \subitem {\_\_cudampi\_\_terminateMPI}, \hyperpage{26}
+    \subitem {\_\_cudampi\_\_time\_us}, \hyperpage{33}
+    \subitem {\_\_cudampi\_\_timemeasured}, \hyperpage{33}
+    \subitem {\_\_cudampi\_\_timestart}, \hyperpage{33}
+    \subitem {\_\_cudampi\_\_timestop}, \hyperpage{33}
+    \subitem {\_\_cudampi\_\_totalEnergyUsed}, \hyperpage{33}
+    \subitem {\_\_cudampi\_isLocalGpu}, \hyperpage{10}
+    \subitem {\_\_cudampi\_targetGPUfordevice}, \hyperpage{33}
+    \subitem {\_\_cudampi\_targetMPIrankfordevice}, \hyperpage{33}
+    \subitem {\_\_cudampi\_totalcpudevicecount}, \hyperpage{33}
+    \subitem {\_\_cudampi\_totaldevicecount}, \hyperpage{34}
+    \subitem {\_\_cudampi\_totalgpudevicecount}, \hyperpage{34}
+    \subitem {asyncMsgCounter}, \hyperpage{34}
+    \subitem {cpuEnergyLock}, \hyperpage{34}
+    \subitem {cpuLastEnergyMeasured}, \hyperpage{34}
+    \subitem {deviceselectionlock}, \hyperpage{34}
+    \subitem {ENABLE\_LOGGING}, \hyperpage{10}
+    \subitem {getMsgCounter}, \hyperpage{26}
+    \subitem {initiateAsyncRecv}, \hyperpage{27}
+    \subitem {initiateAsyncSendCpu}, \hyperpage{27}
+    \subitem {isInitialCpuEnergyMeasured}, \hyperpage{34}
+    \subitem {memcpy\_queue\_entry\_t}, \hyperpage{11}
+    \subitem {MPI\_LOGGING}, \hyperpage{10}
+    \subitem {powermeasurecounter}, \hyperpage{34}
+    \subitem {process\_queue}, \hyperpage{27}
+    \subitem {TAILQ\_HEAD}, \hyperpage{28}
+    \subitem {waitForAsyncSendResponse}, \hyperpage{28}
+  \item {cudampislave.c}, \hyperpage{35}
+    \subitem {\_\_cudampi\_\_GPUcountspernode}, \hyperpage{44}
+    \subitem {\_\_cudampi\_\_MPIproccount}, \hyperpage{44}
+    \subitem {\_\_cudampi\_\_communicators}, \hyperpage{43}
+    \subitem {\_\_cudampi\_\_cpu\_enabled}, \hyperpage{43}
+    \subitem {\_\_cudampi\_\_cpu\_power\_scaling}, \hyperpage{43}
+    \subitem {\_\_cudampi\_\_freeThreadsPerNode}, \hyperpage{43}
+    \subitem {\_\_cudampi\_\_localFreeThreadCount}, \hyperpage{44}
+    \subitem {\_\_cudampi\_\_localGpuDeviceCount}, \hyperpage{44}
+    \subitem {\_\_cudampi\_\_myrank}, \hyperpage{44}
+    \subitem {\_\_cudampi\_\_totaldevicecount}, \hyperpage{44}
+    \subitem {\_\_cudampi\_targetMPIrankfordevice}, \hyperpage{44}
+    \subitem {allocateCpuTaskInStream}, \hyperpage{38}
+    \subitem {ALLOCATED\_IN\_GLOBAL\_BUFFER}, \hyperpage{38}
+    \subitem {ALLOCATED\_SEPARATELY}, \hyperpage{38}
+    \subitem {allocateGpuMemcpyBuffer}, \hyperpage{38}
+    \subitem {bufferAllocationType}, \hyperpage{37}
+    \subitem {CPU\_STREAM\_FOR\_GPU\_RESPONSES}, \hyperpage{37}
+    \subitem {cpuDeviceToHostTaskAsync}, \hyperpage{38}
+    \subitem {cpuEnergyLock}, \hyperpage{44}
+    \subitem {cpuHostToDeviceTaskAsync}, \hyperpage{39}
+    \subitem {cpuLaunchKernelTask}, \hyperpage{39}
+    \subitem {cpuStreamsValid}, \hyperpage{45}
+    \subitem {cpuSynchronize}, \hyperpage{39}
+    \subitem {cpuTaskLauncher}, \hyperpage{39}
+    \subitem {debugTaskCounter}, \hyperpage{45}
+    \subitem {ENABLE\_CHECKING\_MESSAGE\_TYPE}, \hyperpage{37}
+    \subitem {ENABLE\_LOGGING}, \hyperpage{37}
+    \subitem {freeGlobalGpuMemcpyBuffer}, \hyperpage{40}
+    \subitem {freeGpuMemcpyBuffer}, \hyperpage{40}
+    \subitem {gpuDeviceToHostTaskAsync}, \hyperpage{40}
+    \subitem {gpuHostToDeviceTaskAsync}, \hyperpage{41}
+    \subitem {INITIAL\_GPU\_BUFFER\_SIZE}, \hyperpage{37}
+    \subitem {initializeGlobalGpuMemcpyBuffer}, \hyperpage{41}
+    \subitem {isInitialCpuEnergyMeasured}, \hyperpage{45}
+    \subitem {launchcpukernel}, \hyperpage{41}
+    \subitem {launchkernel}, \hyperpage{41}
+    \subitem {launchkernelinstream}, \hyperpage{41}
+    \subitem {logGpuMemcpyError}, \hyperpage{42}
+    \subitem {main}, \hyperpage{42}
+    \subitem {MPI\_LOGGING}, \hyperpage{37}
+    \subitem {scheduleCpuTask}, \hyperpage{42}
+    \subitem {TAILQ\_HEAD}, \hyperpage{43}
+    \subitem {task\_queue\_entry\_t}, \hyperpage{37}
+    \subitem {terminated}, \hyperpage{45}
+    \subitem {updateGlobalGpuMemcpyBuffer}, \hyperpage{43}
+
+  \indexspace
+
+  \item {debugTaskCounter}
+    \subitem {cudampislave.c}, \hyperpage{45}
+  \item {deviceselectionlock}
+    \subitem {cudampilib.c}, \hyperpage{34}
+
+  \indexspace
+
+  \item {ENABLE\_CHECKING\_MESSAGE\_TYPE}
+    \subitem {cudampislave.c}, \hyperpage{37}
+  \item {ENABLE\_LOGGING}
+    \subitem {cudampicommon.c}, \hyperpage{4}
+    \subitem {cudampilib.c}, \hyperpage{10}
+    \subitem {cudampislave.c}, \hyperpage{37}
+
+  \indexspace
+
+  \item {freeGlobalGpuMemcpyBuffer}
+    \subitem {cudampislave.c}, \hyperpage{40}
+  \item {freeGpuMemcpyBuffer}
+    \subitem {cudampislave.c}, \hyperpage{40}
+
+  \indexspace
+
+  \item {getCpuEnergyUsed}
+    \subitem {cudampicommon.c}, \hyperpage{5}
+  \item {getGPUpower}
+    \subitem {cudampicommon.c}, \hyperpage{5}
+  \item {getMsgCounter}
+    \subitem {cudampilib.c}, \hyperpage{26}
+  \item {gpuDeviceToHostTaskAsync}
+    \subitem {cudampislave.c}, \hyperpage{40}
+  \item {gpuHostToDeviceTaskAsync}
+    \subitem {cudampislave.c}, \hyperpage{41}
+
+  \indexspace
+
+  \item {INITIAL\_GPU\_BUFFER\_SIZE}
+    \subitem {cudampislave.c}, \hyperpage{37}
+  \item {initializeCpuEnergyMeasurement}
+    \subitem {cudampicommon.c}, \hyperpage{5}
+  \item {initializeGlobalGpuMemcpyBuffer}
+    \subitem {cudampislave.c}, \hyperpage{41}
+  \item {initiateAsyncRecv}
+    \subitem {cudampilib.c}, \hyperpage{27}
+  \item {initiateAsyncSendCpu}
+    \subitem {cudampilib.c}, \hyperpage{27}
+  \item {isInitialCpuEnergyMeasured}
+    \subitem {cudampilib.c}, \hyperpage{34}
+    \subitem {cudampislave.c}, \hyperpage{45}
+
+  \indexspace
+
+  \item {launchcpukernel}
+    \subitem {cudampislave.c}, \hyperpage{41}
+  \item {launchkernel}
+    \subitem {cudampislave.c}, \hyperpage{41}
+  \item {launchkernelinstream}
+    \subitem {cudampislave.c}, \hyperpage{41}
+  \item {logGpuMemcpyError}
+    \subitem {cudampislave.c}, \hyperpage{42}
+
+  \indexspace
+
+  \item {main}
+    \subitem {cudampislave.c}, \hyperpage{42}
+  \item {memcpy\_queue\_entry\_t}
+    \subitem {cudampilib.c}, \hyperpage{11}
+  \item {MPI\_LOGGING}
+    \subitem {cudampicommon.c}, \hyperpage{4}
+    \subitem {cudampilib.c}, \hyperpage{10}
+    \subitem {cudampislave.c}, \hyperpage{37}
+
+  \indexspace
+
+  \item {powermeasurecounter}
+    \subitem {cudampilib.c}, \hyperpage{34}
+  \item {process\_queue}
+    \subitem {cudampilib.c}, \hyperpage{27}
+
+  \indexspace
+
+  \item {scheduleCpuTask}
+    \subitem {cudampislave.c}, \hyperpage{42}
+
+  \indexspace
+
+  \item {TAILQ\_HEAD}
+    \subitem {cudampilib.c}, \hyperpage{28}
+    \subitem {cudampislave.c}, \hyperpage{43}
+  \item {task\_queue\_entry\_t}
+    \subitem {cudampislave.c}, \hyperpage{37}
+  \item {terminated}
+    \subitem {cudampislave.c}, \hyperpage{45}
+
+  \indexspace
+
+  \item {updateGlobalGpuMemcpyBuffer}
+    \subitem {cudampislave.c}, \hyperpage{43}
+
+  \indexspace
+
+  \item {waitForAsyncSendResponse}
+    \subitem {cudampilib.c}, \hyperpage{28}
+
+\end{theindex}

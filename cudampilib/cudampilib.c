@@ -137,6 +137,11 @@ TAILQ_HEAD(memcpy_queue_head, memcpy_queue_entry);
 // Declare queues for memcpy operations
 struct memcpy_queue_head __cudampi__memcpy_queues[__CUDAMPI_MAX_THREAD_COUNT];
 
+/**
+ * @brief Gets the current batch size.
+ * 
+ * @return unsigned long The current batch size.
+ */
 unsigned long __cudampi__getCurrentBatchSize() {
   unsigned long ret = 0;
 
@@ -150,8 +155,11 @@ unsigned long __cudampi__getCurrentBatchSize() {
   return ret;
 }
 
-// Start measurement of first iteration (between first kernel call and first synchronize call) performance for each device
-// This function starts measurement when first kernel is called and increments amount of processed data with each kernel call
+/**
+ * @brief Records the batch size for device statistics.
+ * 
+ * @param batchsize The batch size to record.
+ */
 void __cudampi__recordBatchSizeForDeviceStats(unsigned long batchsize) {
   if (!__cudampi__dyanmicCpuBatchSizeScalingEnabled) {
     return;
@@ -175,7 +183,11 @@ void __cudampi__recordBatchSizeForDeviceStats(unsigned long batchsize) {
   }
 }
 
-// This function will be called after every synchronize call, but will actually only have effect in first call
+/**
+ * @brief Finishes device statistics measurement.
+ * 
+ * @param elapsedTimeSeconds The elapsed time in seconds.
+ */
 void __cudampi__finishDeviceStatsMeasurement(double elapsedTimeSeconds) {
   if (!__cudampi__dyanmicCpuBatchSizeScalingEnabled) {
     return;
@@ -205,7 +217,11 @@ void __cudampi__finishDeviceStatsMeasurement(double elapsedTimeSeconds) {
   }
 }
 
-// Check if all devices already finished first iteration
+/**
+ * @brief Checks if the system is ready for CPU batch size scaling.
+ * 
+ * @return int 1 if ready, 0 otherwise.
+ */
 int __cudampi__readyForCpuBatchSizeScaling() {
   int nCpuMeasured;
   int nGpuMeasured;
@@ -219,6 +235,9 @@ int __cudampi__readyForCpuBatchSizeScaling() {
   return ((nCpuMeasured >= __cudampi_totalcpudevicecount) && (nGpuMeasured >= __cudampi_totalgpudevicecount));
 }
 
+/**
+ * @brief Scales the CPU batch size.
+ */
 void __cudampi__scaleCpuBatchSize() {
   if (!__cudampi__dyanmicCpuBatchSizeScalingEnabled) {
     return;
@@ -267,6 +286,11 @@ void __cudampi__scaleCpuBatchSize() {
   }
 }
 
+/**
+ * @brief Gets a unique message counter for asynchronous messages.
+ * 
+ * @return int The unique message counter.
+ */
 int getMsgCounter() {
   int result;
   #pragma omp critical
@@ -281,6 +305,14 @@ int getMsgCounter() {
   return result;
 }
 
+/**
+ * @brief Parses command line options.
+ * 
+ * @param key The key of the option.
+ * @param arg The argument of the option.
+ * @param state The state of the argument parser.
+ * @return error_t Error code.
+ */
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
   struct __cudampi__arguments_type *arguments = state->input;
@@ -314,6 +346,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+/**
+ * @brief Initiates an asynchronous receive operation.
+ * 
+ * @param dst The destination buffer.
+ * @param count The number of bytes to receive.
+ * @param counter The message counter.
+ */
 void initiateAsyncRecv(void* dst, unsigned long count, int counter)
 { 
   memcpy_queue_entry_t *item = malloc(sizeof(memcpy_queue_entry_t));
@@ -330,6 +369,13 @@ void initiateAsyncRecv(void* dst, unsigned long count, int counter)
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
+/**
+ * @brief Initiates an asynchronous send operation for the CPU.
+ * 
+ * @param src The source buffer.
+ * @param count The number of bytes to send.
+ * @param counter The message counter.
+ */
 void initiateAsyncSendCpu(const void* src, unsigned long count, int counter)
 { 
   // For CPU, asynchronously send data to device and asynchronously wait for response
@@ -346,6 +392,11 @@ void initiateAsyncSendCpu(const void* src, unsigned long count, int counter)
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
+/**
+ * @brief Waits for an asynchronous send response.
+ * 
+ * @param counter The message counter.
+ */
 void waitForAsyncSendResponse(int counter)
 { 
   // For GPU, synchronously send data to device and asynchronously wait for response
@@ -362,6 +413,9 @@ void waitForAsyncSendResponse(int counter)
   TAILQ_INSERT_TAIL(__cudampi__currentMemcpyQueue, item, entries);
 }
 
+/**
+ * @brief Processes the memcpy queue.
+ */
 void process_queue() {
     memcpy_queue_entry_t* item;
     MPI_Status status;
@@ -384,13 +438,22 @@ void process_queue() {
     }
 }
 
+/**
+ * @brief Sets the global power limit.
+ * 
+ * @param powerlimit The power limit in watts.
+ */
 void __cudampi__setglobalpowerlimit(float powerlimit) {
 
   __cudampi__isglobalpowerlimitset = 1;
   __cudampi__globalpowerlimit = powerlimit;
 }
 
-
+/**
+ * @brief Gets the total power of selected devices.
+ * 
+ * @return float The total power of selected devices.
+ */
 float __cudampi__gettotalpowerofselecteddevices() { // gets total power of currently enabled devices
   int i;
   float power = 0;
@@ -426,6 +489,11 @@ float __cudampi__gettotalpowerofselecteddevices() { // gets total power of curre
   return power;
 }
 
+/**
+ * @brief Selects devices for the power limit using a greedy strategy.
+ * 
+ * @return int 1 if successful, 0 otherwise.
+ */
 int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy for selecting devices
                                                      // returns 1 if successful, 0 otherwise - if not all devices have been recorder power
   int i;
@@ -541,10 +609,14 @@ int __cudampi__selectdevicesforpowerlimit_greedy() { // adopts a greedy strategy
   return 1;
 }
 
-__cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, long long max) { 
-  return __cudampi__getnextchunkindex_enableddevices(globalcounter, __cudampi__getCurrentBatchSize(), max); 
-}
-
+/**
+ * @brief Gets the next chunk index for enabled devices.
+ * 
+ * @param globalcounter Pointer to the global counter.
+ * @param batchsize The batch size.
+ * @param max The maximum value.
+ * @return __cudampi__batch_pointer The batch pointer.
+ */
 __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max) {
   // for a given thread return the next available data chunk
   // max is the vector size
@@ -577,6 +649,14 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *
   return batch_pointer;
 }
 
+/**
+ * @brief Gets the next chunk index for all devices.
+ * 
+ * @param globalcounter Pointer to the global counter.
+ * @param batchsize The batch size.
+ * @param max The maximum value.
+ * @return __cudampi__batch_pointer The batch pointer.
+ */
 __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max) {
   // for a given thread (GPU) return the next available data chunk
   // max is the vector size
@@ -601,6 +681,12 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *glob
   return batch_pointer;
 }
 
+/**
+ * @brief Checks if a device is enabled.
+ * 
+ * @param deviceid The device ID.
+ * @return int 1 if enabled, 0 otherwise.
+ */
 int __cudampi__isdeviceenabled(int deviceid) {
   int val;
 
@@ -610,23 +696,47 @@ int __cudampi__isdeviceenabled(int deviceid) {
   return val;
 }
 
+/**
+ * @brief Gets the total device count.
+ * 
+ * @param count Pointer to the device count.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__getDeviceCount(int *count) {
   *count =  __cudampi_totaldevicecount;
   return cudaSuccess;
 }
 
+/**
+ * @brief Gets the GPU device count.
+ * 
+ * @param count Pointer to the GPU device count.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaGetDeviceCount(int *count) {
 
   *count = __cudampi_totalgpudevicecount;
   return cudaSuccess;
 }
 
+/**
+ * @brief Gets the CPU device count.
+ * 
+ * @param count Pointer to the CPU device count.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuGetDeviceCount(int *count) {
 
   *count = __cudampi_totalcpudevicecount;
   return cudaSuccess;
 }
 
+/**
+ * @brief Initializes MPI.
+ * 
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ */
 void __cudampi__initializeMPI(int argc, char **argv) {
 
   int mtsprovided;
@@ -869,6 +979,9 @@ void __cudampi__initializeMPI(int argc, char **argv) {
   }
 }
 
+/**
+ * @brief Terminates MPI.
+ */
 void __cudampi__terminateMPI() {
 
   for (int i = 0; i < __cudampi_totaldevicecount;i++){
@@ -895,6 +1008,12 @@ void __cudampi__terminateMPI() {
   MPI_Finalize();
 }
 
+/**
+ * @brief Gets the target GPU ID for a device.
+ * 
+ * @param device The device ID.
+ * @return int The target GPU ID.
+ */
 int __cudampi__gettargetGPU(int device) {
   // gets target GPU id
 
@@ -902,6 +1021,12 @@ int __cudampi__gettargetGPU(int device) {
   //  return device%__cudampi__GPUcountpernode;
 }
 
+/**
+ * @brief Gets the target MPI rank for a device.
+ * 
+ * @param device The device ID.
+ * @return int The target MPI rank.
+ */
 int __cudampi__gettargetMPIrank(int device) {
   // gets target MPI rank based on local GPU id
 
@@ -909,6 +1034,13 @@ int __cudampi__gettargetMPIrank(int device) {
   //  return device/__cudampi__GPUcountpernode;
 }
 
+/**
+ * @brief Allocates memory on the GPU.
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @param size The size of the memory to allocate.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
 
   if (__cudampi_isLocalGpu) { // run locally
@@ -935,6 +1067,13 @@ cudaError_t __cudampi__cudaMalloc(void **devPtr, size_t size) {
   }
 }
 
+/**
+ * @brief Allocates memory on the CPU.
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @param size The size of the memory to allocate.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
   // allocate remotely
 
@@ -957,6 +1096,13 @@ cudaError_t __cudampi__cpuMalloc(void **devPtr, size_t size) {
   return ((cudaError_t)(rdata + sizeof(void *)));
 }
 
+/**
+ * @brief Allocates memory on the appropriate device (CPU or GPU).
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @param size The size of the memory to allocate.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
   if (__cudampi__isCpu()) {
     return __cudampi__cpuMalloc(devPtr, size);
@@ -965,7 +1111,12 @@ cudaError_t __cudampi__malloc(void **devPtr, size_t size) {
   return __cudampi__cudaMalloc(devPtr, size);
 }
 
-
+/**
+ * @brief Frees memory on the GPU.
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaFree(void *devPtr) {
   // as for cudaMalloc but just free
 
@@ -988,6 +1139,12 @@ cudaError_t __cudampi__cudaFree(void *devPtr) {
   }
 }
 
+/**
+ * @brief Frees memory on the CPU.
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuFree(void *devPtr) {
   // allocate remotely
   // data for sending (devPtr pointer address)
@@ -1006,6 +1163,12 @@ cudaError_t __cudampi__cpuFree(void *devPtr) {
   return *((cudaError_t *)rdata);
 }
 
+/**
+ * @brief Frees memory on the appropriate device (CPU or GPU).
+ * 
+ * @param devPtr Pointer to the device pointer.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__free(void *devPtr) {
   if (__cudampi__isCpu()) {
     return __cudampi__cpuFree(devPtr);
@@ -1014,11 +1177,21 @@ cudaError_t __cudampi__free(void *devPtr) {
   return __cudampi__cudaFree(devPtr);
 }
 
+/**
+ * @brief Synchronizes the device (GPU or CPU).
+ * 
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaDeviceSynchronize(void)
 {
   return __cudampi__deviceSynchronize();
 }
 
+/**
+ * @brief Synchronizes the device (GPU or CPU).
+ * 
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__deviceSynchronize(void) {
 
   cudaError_t retVal;
@@ -1180,6 +1353,12 @@ cudaError_t __cudampi__deviceSynchronize(void) {
   return retVal;
 }
 
+/**
+ * @brief Sets the device (GPU or CPU).
+ * 
+ * @param device The device ID.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaSetDevice(int device) {
 
   __cudampi__currentDevice = device; // set it for the current thread
@@ -1200,12 +1379,23 @@ cudaError_t __cudampi__cudaSetDevice(int device) {
   }
 }
 
+/**
+ * @brief Checks if the current device is a CPU.
+ * 
+ * @return int 1 if CPU, 0 otherwise.
+ */
 int __cudampi__isCpu()
 {
   // TODO ?
   return __cudampi__currentDevice  >= __cudampi_totalgpudevicecount;
 }
 
+/**
+ * @brief Sets the device (CPU or GPU).
+ * 
+ * @param device The device ID.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__setDevice(int device) {
   __cudampi__currentDevice = device; // set it for the current thread
   if (!__cudampi__isCpu()) {
@@ -1215,6 +1405,15 @@ cudaError_t __cudampi__setDevice(int device) {
   return cudaSuccess;
 }
 
+/**
+ * @brief Copies memory between host and device (GPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 
   if (__cudampi_isLocalGpu) { // run locally
@@ -1259,6 +1458,15 @@ cudaError_t __cudampi__cudaMemcpy(void *dst, const void *src, size_t count, enum
   }
 }
 
+/**
+ * @brief Copies memory between host and device (CPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   // run remotely
   if (kind == cudaMemcpyHostToDevice) {
@@ -1300,6 +1508,16 @@ cudaError_t __cudampi__cpuMemcpy(void *dst, const void *src, size_t count, enum 
   }
 }
 
+/**
+ * @brief Asynchronously copies memory between host and device (GPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
 
   int counter = getMsgCounter();
@@ -1339,6 +1557,16 @@ cudaError_t __cudampi__cudaMemcpyAsync(void *dst, const void *src, size_t count,
   }
 }
 
+/**
+ * @brief Asynchronously copies memory between host and device (CPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
   // run remotely
   int counter = getMsgCounter();
@@ -1378,8 +1606,13 @@ cudaError_t __cudampi__cpuMemcpyAsync(void *dst, const void *src, size_t count, 
   }
 }
 
-void launchkernelinstream(void *devPtr, unsigned long batchSize, cudaStream_t stream);
-
+/**
+ * @brief Launches a CUDA kernel in a specific stream.
+ * 
+ * @param devPtr Device pointer.
+ * @param batchsize Batch size.
+ * @param stream CUDA stream.
+ */
 void __cudampi__cudaKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream) {
   __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
@@ -1400,8 +1633,12 @@ void __cudampi__cudaKernelInStream(void *devPtr, unsigned long batchsize, cudaSt
   }
 }
 
-void launchkernel(void *devPtr, unsigned long batchSize);  // extern from .cu
-
+/**
+ * @brief Launches a CUDA kernel.
+ * 
+ * @param devPtr Device pointer.
+ * @param batchsize Batch size.
+ */
 void __cudampi__cudaKernel(void *devPtr, unsigned long batchsize) {
   __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
@@ -1425,6 +1662,13 @@ void __cudampi__cudaKernel(void *devPtr, unsigned long batchsize) {
   }
 }
 
+/**
+ * @brief Launches a CPU kernel in a specific stream.
+ * 
+ * @param devPtr Device pointer.
+ * @param batchsize Batch size.
+ * @param stream CUDA stream.
+ */
 void __cudampi__cpuKernelInStream(void *devPtr, unsigned long batchsize, cudaStream_t stream){
   __cudampi__recordBatchSizeForDeviceStats(batchsize);
 
@@ -1440,10 +1684,22 @@ void __cudampi__cpuKernelInStream(void *devPtr, unsigned long batchsize, cudaStr
   // No need to wait for response since all kernels return void
 }
 
+/**
+ * @brief Launches a CPU kernel.
+ * 
+ * @param devPtr Device pointer.
+ * @param batchsize Batch size.
+ */
 void __cudampi__cpuKernel(void *devPtr, unsigned long batchsize) {
   __cudampi__cpuKernelInStream(devPtr, batchsize, NULL);
 }
 
+/**
+ * @brief Creates a CUDA stream.
+ * 
+ * @param pStream Pointer to the CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
 
   if (__cudampi_isLocalGpu) { // run locally
@@ -1468,6 +1724,12 @@ cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream) {
   }
 }
 
+/**
+ * @brief Destroys a CUDA stream.
+ * 
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream) {
 
   if (__cudampi_isLocalGpu) { // run locally
@@ -1490,6 +1752,12 @@ cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream) {
   }
 }
 
+/**
+ * @brief Creates a CPU stream.
+ * 
+ * @param pStream Pointer to the CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuStreamCreate(cudaStream_t *pStream) {
   // create a stream remotely
   // we then return the actual pointer from another node -- it is used only on that node
@@ -1509,6 +1777,12 @@ cudaError_t __cudampi__cpuStreamCreate(cudaStream_t *pStream) {
   return ((cudaError_t)(rdata + sizeof(void *)));
 }
 
+/**
+ * @brief Destroys a CPU stream.
+ * 
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__cpuStreamDestroy(cudaStream_t stream) {
   // destroy remotely
 
@@ -1527,6 +1801,12 @@ cudaError_t __cudampi__cpuStreamDestroy(cudaStream_t stream) {
   return ((cudaError_t)rdata);
 }
 
+/**
+ * @brief Creates a stream (CPU or GPU).
+ * 
+ * @param stream Pointer to the CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__streamCreate(cudaStream_t *stream) {
   if (__cudampi__isCpu()) {
     return __cudampi__cpuStreamCreate(stream);;
@@ -1535,6 +1815,12 @@ cudaError_t __cudampi__streamCreate(cudaStream_t *stream) {
   return __cudampi__cudaStreamCreate(stream);
 }
 
+/**
+ * @brief Destroys a stream (CPU or GPU).
+ * 
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__streamDestroy(cudaStream_t stream) {
   if (__cudampi__isCpu()) {
     return __cudampi__cpuStreamDestroy(stream);
@@ -1543,6 +1829,16 @@ cudaError_t __cudampi__streamDestroy(cudaStream_t stream) {
   return __cudampi__cudaStreamDestroy(stream);
 }
 
+/**
+ * @brief Asynchronously copies memory between host and device (CPU or GPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @param stream CUDA stream.
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
   if (__cudampi__isCpu())
   {
@@ -1552,6 +1848,15 @@ cudaError_t __cudampi__memcpyAsync(void *dst, const void *src, size_t count, enu
   return __cudampi__cudaMemcpyAsync(dst, src, count, kind, stream);
 }
 
+/**
+ * @brief Copies memory between host and device (CPU or GPU).
+ * 
+ * @param dst Destination pointer.
+ * @param src Source pointer.
+ * @param count Number of bytes to copy.
+ * @param kind Type of copy (host to device or device to host).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
   if (__cudampi__isCpu())
   {
@@ -1561,6 +1866,12 @@ cudaError_t __cudampi__memcpy(void *dst, const void *src, size_t count, enum cud
   return __cudampi__cudaMemcpy(dst, src, count, kind);
 }
 
+/**
+ * @brief Launches a kernel in a specific stream (CPU or GPU).
+ * 
+ * @param devPtr Device pointer.
+ * @param stream CUDA stream.
+ */
 void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream) {
   if (__cudampi__isCpu())
   {
@@ -1570,6 +1881,11 @@ void __cudampi__kernelInStream(void *devPtr, cudaStream_t stream) {
   return __cudampi__cudaKernelInStream(devPtr, __cudampi__getCurrentBatchSize(), stream);
 }
 
+/**
+ * @brief Launches a kernel (CPU or GPU).
+ * 
+ * @param devPtr Device pointer.
+ */
 void __cudampi__kernel(void *devPtr) {
   if (__cudampi__isCpu())
   {

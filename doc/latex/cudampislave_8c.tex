@@ -1,0 +1,44 @@
+
+\doxysubsection*{cudampislave.\+c}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{cudampislave_8c_a3e4557fed6f815aeee7b4a7f35437798}{TAILQ\+\_\+\+HEAD}} (task\+\_\+queue\+\_\+head, task\+\_\+queue\+\_\+entry)
+\item 
+void \mbox{\hyperlink{cudampislave_8c_a6bfb72a139f89bc74e6d2bb22beaccf1}{launchkernel}} (void $\ast$dev\+Ptr, unsigned long batch\+Size)
+\item 
+void \mbox{\hyperlink{cudampislave_8c_a19c5413a52f7c53e0e99bb180efa050d}{launchkernelinstream}} (void $\ast$dev\+Ptr, unsigned long batch\+Size, cuda\+Stream\+\_\+t stream)
+\item 
+void \mbox{\hyperlink{cudampislave_8c_a62b974b27fac23c645ba65096ede339e}{launchcpukernel}} (void $\ast$dev\+Ptr, unsigned long batch\+Size, int thread\+\_\+count)
+\item 
+allocated\+Gpu\+Memcpy\+Buffer \mbox{\hyperlink{cudampislave_8c_ab774ad99109c2eb57cb77955d2a952b3}{allocate\+Gpu\+Memcpy\+Buffer}} (global\+Gpu\+Memcpy\+Buffer $\ast$global, unsigned long long count)
+\begin{DoxyCompactList}\small\item\em Allocates a GPU memory copy buffer. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_aba51c9d594a49bdd54f23ac31143b9f9}{free\+Gpu\+Memcpy\+Buffer}} (allocated\+Gpu\+Memcpy\+Buffer $\ast$allocated\+Buffer)
+\begin{DoxyCompactList}\small\item\em Frees a GPU memory copy buffer. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_aa15a97ad574b5cc7c65f0360e27d0c38}{update\+Global\+Gpu\+Memcpy\+Buffer}} (global\+Gpu\+Memcpy\+Buffer $\ast$global)
+\begin{DoxyCompactList}\small\item\em Updates the global GPU memory copy buffer. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_ab985ed875be6ca695d322e7276f304c8}{initialize\+Global\+Gpu\+Memcpy\+Buffer}} (global\+Gpu\+Memcpy\+Buffer $\ast$global, unsigned long count)
+\begin{DoxyCompactList}\small\item\em Initializes the global GPU memory copy buffer. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_a2a89ace7377ebf1ab5ca378fb25b8eb4}{free\+Global\+Gpu\+Memcpy\+Buffer}} (global\+Gpu\+Memcpy\+Buffer $\ast$global)
+\begin{DoxyCompactList}\small\item\em Frees the global GPU memory copy buffer. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_ae4f318d59c0c58e2b1cf130455535842}{cpu\+Synchronize}} ()
+\begin{DoxyCompactList}\small\item\em Synchronizes CPU tasks. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_a18aa8aae84c394253cee68bd91383db0}{cpu\+Host\+To\+Device\+Task\+Async}} (void $\ast$arg)
+\begin{DoxyCompactList}\small\item\em Asynchronously transfers data from host to device on the CPU. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_a152e78f2497fd6567be4a95c263be7f7}{cpu\+Device\+To\+Host\+Task\+Async}} (void $\ast$arg)
+\begin{DoxyCompactList}\small\item\em Asynchronously transfers data from device to host on the CPU. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_ace201c14f75f51b83417f025748f4fe6}{gpu\+Host\+To\+Device\+Task\+Async}} (void $\ast$arg)
+\begin{DoxyCompactList}\small\item\em Asynchronously transfers data from host to device on the GPU. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_aae7c1141c98eca8de911b76dbf429d7b}{gpu\+Device\+To\+Host\+Task\+Async}} (void $\ast$arg)
+\begin{DoxyCompactList}\small\item\em Asynchronously transfers data from device to host on the GPU. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_adcaa4e466bc18820d427d0af0f3cd91b}{log\+Gpu\+Memcpy\+Error}} (cuda\+Error\+\_\+t e, int tag)
+\begin{DoxyCompactList}\small\item\em Logs GPU memory copy errors. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_aac594584985fbfed01f4f465f6d36d90}{cpu\+Launch\+Kernel\+Task}} (void $\ast$arg)
+\begin{DoxyCompactList}\small\item\em Launches a CPU kernel task. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_a270f29df6e63be456ea978dd78156082}{allocate\+Cpu\+Task\+In\+Stream}} (void($\ast$task\+\_\+func)(void $\ast$), void $\ast$arg, unsigned long stream)
+\begin{DoxyCompactList}\small\item\em Allocates a CPU task in a specific stream. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_ae72af1eae6a9d8f3d1b34e92d2991be2}{schedule\+Cpu\+Task}} (\mbox{\hyperlink{cudampislave_8c_a948df2b406219bc55113f07d4ba07847}{task\+\_\+queue\+\_\+entry\+\_\+t}} $\ast$current\+\_\+task\+\_\+queue\+\_\+entry, unsigned long stream)
+\begin{DoxyCompactList}\small\item\em Schedules a CPU task. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{cudampislave_8c_a7721a7fdc22e17f6729e040ed5fcf7f6}{cpu\+Task\+Launcher}} (unsigned long stream)
+\begin{DoxyCompactList}\small\item\em Launches CPU tasks in a specific stream. \end{DoxyCompactList}\item 
+int \mbox{\hyperlink{cudampislave_8c_a3c04138a5bfe5d72780bb7e82a18e627}{main}} (int argc, char $\ast$$\ast$argv)
+\begin{DoxyCompactList}\small\item\em Main function for the slave process. \end{DoxyCompactList}\end{DoxyCompactItemize}

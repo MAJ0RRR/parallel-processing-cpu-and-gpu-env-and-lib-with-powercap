@@ -134,6 +134,13 @@ typedef struct {
   unsigned long batchSize;
 } launch_kernel_args_t;
 
+/**
+ * @brief Allocates a GPU memory copy buffer.
+ * 
+ * @param global Pointer to the global GPU memory copy buffer.
+ * @param count Number of bytes to allocate.
+ * @return allocatedGpuMemcpyBuffer The allocated buffer.
+ */
 allocatedGpuMemcpyBuffer allocateGpuMemcpyBuffer (globalGpuMemcpyBuffer* global, unsigned long long count) {
   unsigned char* data;
   bufferAllocationType allocationType;
@@ -169,6 +176,11 @@ allocatedGpuMemcpyBuffer allocateGpuMemcpyBuffer (globalGpuMemcpyBuffer* global,
   return ret;
 }
 
+/**
+ * @brief Frees a GPU memory copy buffer.
+ * 
+ * @param allocatedBuffer Pointer to the allocated buffer to free.
+ */
 void freeGpuMemcpyBuffer(allocatedGpuMemcpyBuffer* allocatedBuffer) {
   switch (allocatedBuffer->allocation)
   {
@@ -187,6 +199,11 @@ void freeGpuMemcpyBuffer(allocatedGpuMemcpyBuffer* allocatedBuffer) {
   }
 }
 
+/**
+ * @brief Updates the global GPU memory copy buffer.
+ * 
+ * @param global Pointer to the global GPU memory copy buffer.
+ */
 void updateGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global) {
   omp_set_lock(&global->lock);
   if (global->allocatedCount > 0) {
@@ -209,6 +226,12 @@ void updateGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global) {
   omp_unset_lock(&global->lock);
 }
 
+/**
+ * @brief Initializes the global GPU memory copy buffer.
+ * 
+ * @param global Pointer to the global GPU memory copy buffer.
+ * @param count Number of bytes to allocate.
+ */
 void initializeGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global, unsigned long count) {
   global->pointer = 0;
   global->allocatedCount = 0;
@@ -223,11 +246,19 @@ void initializeGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global, unsigned lon
   }
 }
 
+/**
+ * @brief Frees the global GPU memory copy buffer.
+ * 
+ * @param global Pointer to the global GPU memory copy buffer.
+ */
 void freeGlobalGpuMemcpyBuffer(globalGpuMemcpyBuffer* global) {
   cudaFreeHost(global->buffer);
   omp_destroy_lock(&global->lock);
 }
 
+/**
+ * @brief Synchronizes CPU tasks.
+ */
 void cpuSynchronize()
 {
   log_message(LOG_DEBUG, "Synchronizing CPU tasks");
@@ -240,6 +271,11 @@ void cpuSynchronize()
   }
 }
 
+/**
+ * @brief Asynchronously transfers data from host to device on the CPU.
+ * 
+ * @param arg Pointer to the arguments for the task.
+ */
 void cpuHostToDeviceTaskAsync(void* arg) {
   cudaError_t e = cudaErrorInvalidValue;
   cpu_host_to_device_args_t *args = (cpu_host_to_device_args_t*) arg;
@@ -254,6 +290,11 @@ void cpuHostToDeviceTaskAsync(void* arg) {
   free(arg);
 }
 
+/**
+ * @brief Asynchronously transfers data from device to host on the CPU.
+ * 
+ * @param arg Pointer to the arguments for the task.
+ */
 void cpuDeviceToHostTaskAsync(void* arg) {
   cudaError_t e = cudaErrorInvalidValue;
   cpu_device_to_host_args_t *args = (cpu_device_to_host_args_t*) arg;
@@ -268,6 +309,11 @@ void cpuDeviceToHostTaskAsync(void* arg) {
   free(arg);
 }
 
+/**
+ * @brief Asynchronously transfers data from host to device on the GPU.
+ * 
+ * @param arg Pointer to the arguments for the task.
+ */
 void gpuHostToDeviceTaskAsync(void* arg) {
   gpu_host_to_device_args_t *args = (gpu_host_to_device_args_t*) arg;
 
@@ -280,6 +326,11 @@ void gpuHostToDeviceTaskAsync(void* arg) {
   free(arg);
 }
 
+/**
+ * @brief Asynchronously transfers data from device to host on the GPU.
+ * 
+ * @param arg Pointer to the arguments for the task.
+ */
 void gpuDeviceToHostTaskAsync(void* arg) {
   gpu_device_to_host_args_t *args = (gpu_device_to_host_args_t*) arg;
 
@@ -296,18 +347,36 @@ void gpuDeviceToHostTaskAsync(void* arg) {
   free(arg);
 }
 
+/**
+ * @brief Logs GPU memory copy errors.
+ * 
+ * @param e The CUDA error code.
+ * @param tag The MPI tag.
+ */
 void logGpuMemcpyError(cudaError_t e, int tag) {
   log_message(LOG_ERROR, "logGpuMemcpyError: Error allocating host memory");
   // Just send the error response
   MPI_Send((unsigned char *)(&e), sizeof(cudaError_t), MPI_UNSIGNED_CHAR, 0, tag + 1, __cudampi__communicators[omp_get_thread_num()]);
 }
 
+/**
+ * @brief Launches a CPU kernel task.
+ * 
+ * @param arg Pointer to the arguments for the task.
+ */
 void cpuLaunchKernelTask(void* arg) {
   launch_kernel_args_t *args = (launch_kernel_args_t*) arg; 
   launchcpukernel(args->kernelArg, args->batchSize, __cudampi__localFreeThreadCount - 1);
   free(arg);
 }
 
+/**
+ * @brief Allocates a CPU task in a specific stream.
+ * 
+ * @param task_func Function pointer to the task function.
+ * @param arg Pointer to the arguments for the task.
+ * @param stream The stream to allocate the task in.
+ */
 void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long stream)
 {
   // This function takes a function pointer and argument and adds task to execute it to the list
@@ -346,6 +415,12 @@ void allocateCpuTaskInStream(void (*task_func)(void *), void *arg, unsigned long
   log_message(LOG_DEBUG, "Created CPU task dependency node. Task ID = %d\n", new_dep->id);
 }
 
+/**
+ * @brief Schedules a CPU task.
+ * 
+ * @param current_task_queue_entry Pointer to the current task queue entry.
+ * @param stream The stream to schedule the task in.
+ */
 void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry, unsigned long stream)
 {
   // This function exists, so that independent copy of current_task_queue_entry would be created.
@@ -435,6 +510,11 @@ void scheduleCpuTask(task_queue_entry_t* current_task_queue_entry, unsigned long
   }
 }
 
+/**
+ * @brief Launches CPU tasks in a specific stream.
+ * 
+ * @param stream The stream to launch tasks in.
+ */
 void cpuTaskLauncher(unsigned long stream)
 {
   // The assumption here is that there is only one thread executing this code.
@@ -453,6 +533,13 @@ void cpuTaskLauncher(unsigned long stream)
   omp_unset_lock(&queue_locks[stream]);
 }
 
+/**
+ * @brief Main function for the slave process.
+ * 
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return int Exit status.
+ */
 int main(int argc, char **argv) {
 
   // basically this is a slave process that waits for requests and redirects
