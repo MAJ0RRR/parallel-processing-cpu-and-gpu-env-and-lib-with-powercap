@@ -77,3 +77,19 @@ Command: ./run_scripts/run-app rnn B 2 --cpu-enabled=1 --number-of-streams=2 --b
   Max Power: 166.93 W
   Total Elapsed Time: 20391.82 seconds
   Total Energy Consumption: 3448223.65 J
+
+Command: ./run_scripts/run-app twinprime B 2 --cpu-enabled=0 --number-of-streams=2 --batch-size=480000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+  Average Power: 60.20 W
+  Stddev Power: 0.43 W
+  Min Power: 59.51 W
+  Max Power: 60.97 W
+  Total Elapsed Time: 683.85 seconds
+  Total Energy Consumption: 109172.95 J
+
+Command: ./run_scripts/run-app twinprime B 2 --cpu-enabled=1 --number-of-streams=2 --batch-size=480000 --powercap=0 --problem-size=960000000 --initial-cpu-batch-size-scaling=100
+  Average Power: 168.04 W
+  Stddev Power: 1.52 W
+  Min Power: 165.95 W
+  Max Power: 170.39 W
+  Total Elapsed Time: 548.05 seconds
+  Total Energy Consumption: 201266.97 J
