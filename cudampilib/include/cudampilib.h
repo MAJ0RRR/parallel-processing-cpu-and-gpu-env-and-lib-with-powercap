@@ -95,6 +95,10 @@ cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream);
 
+cudaError_t __cudampi__cpuStreamCreate(cudaStream_t *pStream)
+
+cudaError_t __cudampi__cpuStreamDestroy(cudaStream_t *pStream)
+
 cudaError_t __cudampi__streamCreate(cudaStream_t *stream);
 
 cudaError_t __cudampi__streamDestroy(cudaStream_t stream);
