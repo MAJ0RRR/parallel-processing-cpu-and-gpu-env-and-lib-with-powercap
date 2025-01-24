@@ -41,6 +41,8 @@ __cudampi__batch_pointer __cudampi__getnextchunkindex(long long *globalcounter, 
 __cudampi__batch_pointer __cudampi__getnextchunkindex_enableddevices(long long *globalcounter, unsigned long batchsize, long long max);
 __cudampi__batch_pointer __cudampi__getnextchunkindex_alldevices(long long *globalcounter, unsigned long batchsize, long long max);
 
+unsigned long __cudampi__getCurrentBatchSize();
+
 void __cudampi__initializeMPI(int argc, char **argv);
 
 void __cudampi__terminateMPI();
@@ -95,9 +97,9 @@ cudaError_t __cudampi__cudaStreamCreate(cudaStream_t *pStream);
 
 cudaError_t __cudampi__cudaStreamDestroy(cudaStream_t stream);
 
-cudaError_t __cudampi__cpuStreamCreate(cudaStream_t *pStream)
+cudaError_t __cudampi__cpuStreamCreate(cudaStream_t *pStream);
 
-cudaError_t __cudampi__cpuStreamDestroy(cudaStream_t *pStream)
+cudaError_t __cudampi__cpuStreamDestroy(cudaStream_t stream);
 
 cudaError_t __cudampi__streamCreate(cudaStream_t *stream);
 
